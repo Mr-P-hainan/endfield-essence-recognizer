@@ -32,12 +32,12 @@ import win32gui
 import win32ui
 
 from endfield_essence_recognizer.auto_skipper import AutoSkipper
-from endfield_essence_recognizer.capture import (
-    capture_client_roi_np,
-    get_client_rect_screen,
-)
 from endfield_essence_recognizer.essence_scanner import EssenceScanner
 from endfield_essence_recognizer.recognizer import BONUS_ROI, Recognizer
+from endfield_essence_recognizer.screenshot import (
+    capture_client_roi_np,
+    get_client_rect_screen_by_ctypes,
+)
 
 # ============================================================================
 # 日志配置
@@ -170,7 +170,7 @@ def client_pos_from_ratio(hwnd: int, rx: float, ry: float) -> tuple[int, int]:
         # 点击客户区中心
         x, y = client_pos_from_ratio(hwnd, 0.5, 0.5)
     """
-    left, top, width, height = get_client_rect_screen(hwnd)
+    left, top, width, height = get_client_rect_screen_by_ctypes(hwnd)
     x = round(left + rx * width)
     y = round(top + ry * height)
     return x, y
@@ -220,7 +220,7 @@ def screenshot_client(hwnd: int) -> Path | None:
         5. 正确释放所有 GDI 资源，避免内存泄漏
     """
     try:
-        left, top, width, height = get_client_rect_screen(hwnd)
+        left, top, width, height = get_client_rect_screen_by_ctypes(hwnd)
 
         # 获取屏幕设备上下文
         screen_dc = win32gui.GetDC(0)

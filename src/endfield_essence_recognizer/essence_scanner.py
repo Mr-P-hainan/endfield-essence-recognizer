@@ -13,9 +13,9 @@ import win32con
 import win32gui
 import win32ui
 
-from src.endfield_essence_recognizer.capture import (
+from endfield_essence_recognizer.screenshot import (
     capture_client_roi_np,
-    get_client_rect_screen,
+    get_client_rect_screen_by_ctypes,
 )
 from src.endfield_essence_recognizer.recognizer import BONUS_ROI, Recognizer
 
@@ -100,7 +100,7 @@ class EssenceScanner(threading.Thread):
 
                 # 验证窗口是否为支持的游戏窗口
                 if is_supported_window(hwnd):
-                    left, top, _width, _height = get_client_rect_screen(hwnd)
+                    left, top, _width, _height = get_client_rect_screen_by_ctypes(hwnd)
                     logging.info(
                         f"Starting essence scan: {len(icon_pos_grid)} positions"
                     )

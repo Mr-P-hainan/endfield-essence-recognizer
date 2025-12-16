@@ -4,6 +4,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 from cv2.typing import MatLike
+from PIL import Image
 
 type Range = tuple[int, int]
 type Coordinate = tuple[int, int]
@@ -12,9 +13,18 @@ type Slice = slice | tuple[slice, slice]
 
 
 def load_image(
-    image_like: str | Path | bytes | MatLike, flags: cv2.ImreadModes = cv2.IMREAD_COLOR
+    image_like: str | Path | bytes | Image.Image | MatLike,
+    flags: int = cv2.IMREAD_COLOR,
 ) -> MatLike:
-    if isinstance(image_like, str | Path):
+    if isinstance(image_like, Image.Image):
+        image = np.array(image_like)
+        if flags == cv2.IMREAD_COLOR:
+            return cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        elif flags == cv2.IMREAD_GRAYSCALE:
+            return cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+        else:
+            raise ValueError("Unsupported flags for PIL Image input.")
+    elif isinstance(image_like, str | Path):
         return cv2.imdecode(np.fromfile(image_like, dtype=np.uint8), flags)
     elif isinstance(image_like, bytes | bytearray | memoryview):
         return cv2.imdecode(np.frombuffer(image_like, dtype=np.uint8), flags)
