@@ -16,10 +16,9 @@ if TYPE_CHECKING:
 # )
 
 default_format: str = (
-    '<dim>File <cyan>"{file.path}"</>, line <cyan>{line}</>, in <cyan>{function}</></>\n'
     "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</> "
-    '<cyan>"{file.path}"</>, line <cyan>{line}</>, in <cyan>{function}</>'
     "[<level>{level}</>] "
+    "<cyan>{module}</>:<cyan>{function}</>:<cyan>{line}</> | "
     "<level><normal>{message}</></>"
 )
 

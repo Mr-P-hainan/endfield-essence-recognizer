@@ -1,9 +1,9 @@
 import itertools
 from collections import defaultdict
+from collections.abc import Callable
 from pathlib import Path
 
 import cv2
-import numpy as np
 from cv2.typing import MatLike
 
 from endfield_essence_recognizer.image import (
@@ -13,35 +13,44 @@ from endfield_essence_recognizer.image import (
 )
 from endfield_essence_recognizer.log import logger
 
-# 识别ROI区域（客户区像素坐标）
-# 该区域显示基质的属性文本，如"智识提升"等
-BONUS_ROI = (1508, 359, 1680, 390)  # (x1, y1, x2, y2)
-
-# 识别标签列表（所有可能的属性文本）
-BONUS_LABELS = ["智识提升", "敏捷提升", "力量提升", "意志提升", "全能力提升"]
-BASE_DIR = Path(__file__).parent
-TEMPLATES_DIR = BASE_DIR / "templates"  # 模板图片目录
-
 # 识别阈值（默认值，可在 Recognizer 中覆盖）
 HIGH_THRESH = 0.75  # 高置信度阈值：超过此值直接判定
 LOW_THRESH = 0.50  # 低置信度阈值：低于此值判定为未知
 
 
-class Recognizer:
-    """封装模板加载与ROI识别逻辑，便于复用与测试。"""
+def preprocess_text_roi(roi_image: MatLike) -> MatLike:
+    """对 ROI 图像进行预处理，提升识别效果。"""
+    gray = to_gray_image(roi_image)
+    enhanced = linear_operation(gray, 100, 255)
+    return enhanced
 
+
+def preprocess_text_template(template_image: MatLike) -> MatLike:
+    """对模板图像进行预处理，提升识别效果。"""
+    return linear_operation(template_image, 128, 255)
+
+
+class Recognizer:
     def __init__(
         self,
         labels: list[str],
         templates_dir: Path,
         high_thresh: float = HIGH_THRESH,
         low_thresh: float = LOW_THRESH,
+        preprocess_roi: Callable[[MatLike], MatLike] | None = None,
+        preprocess_template: Callable[[MatLike], MatLike] | None = None,
     ) -> None:
         self.labels: list[str] = labels
         self.templates_dir: Path = templates_dir
         self.high_thresh: float = high_thresh
         self.low_thresh: float = low_thresh
-        self._template_cache: defaultdict[str, list[np.ndarray]] = defaultdict(list)
+        self.preprocess_roi: Callable[[MatLike], MatLike] = (
+            preprocess_roi if preprocess_roi is not None else lambda x: x
+        )
+        self.preprocess_template: Callable[[MatLike], MatLike] = (
+            preprocess_template if preprocess_template is not None else lambda x: x
+        )
+        self._template_cache: defaultdict[str, list[MatLike]] = defaultdict(list)
         self._exts: list[str] = [
             ".png",
             ".jpg",
@@ -74,16 +83,6 @@ class Recognizer:
                         logger.error(f"加载模板图像失败 {path}: {e}")
             if not self._template_cache[label]:
                 logger.warning(f"在 {self.templates_dir} 中未找到标签 '{label}' 的模板")
-
-    def preprocess_roi(self, roi_image: MatLike) -> MatLike:
-        """对 ROI 图像进行预处理，提升识别效果。"""
-        gray = to_gray_image(roi_image)
-        enhanced = linear_operation(gray, 100, 255)
-        return enhanced
-
-    def preprocess_template(self, template_image: MatLike) -> MatLike:
-        """对模板图像进行预处理，提升识别效果。"""
-        return linear_operation(template_image, 128, 255)
 
     def recognize_roi(self, roi_image: MatLike) -> tuple[str | None, float]:
         """

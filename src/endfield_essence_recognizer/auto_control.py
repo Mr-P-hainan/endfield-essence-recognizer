@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+import importlib.resources
+import json
 import threading
 import time
 import warnings
@@ -27,7 +29,11 @@ from endfield_essence_recognizer.image import (
     scope_to_slice,
 )
 from endfield_essence_recognizer.log import logger
-from endfield_essence_recognizer.recognizer import Recognizer
+from endfield_essence_recognizer.recognizer import (
+    Recognizer,
+    preprocess_text_roi,
+    preprocess_text_template,
+)
 from endfield_essence_recognizer.screenshot import (
     get_client_rect,
     get_client_rect_screen_by_ctypes,
@@ -39,6 +45,9 @@ from endfield_essence_recognizer.screenshot import (
 
 enable_sound_path = Path("sounds/enable.wav")
 disable_sound_path = Path("sounds/disable.wav")
+weapons_json_path = (
+    importlib.resources.files("endfield_essence_recognizer") / "data" / "weapons.json"
+)
 supported_window_titles = ["EndfieldTBeta2"]
 
 # 全局变量
@@ -54,9 +63,14 @@ icon_pos_grid = np.array(
     [(x, y) for y in essence_icon_y_list for x in essence_icon_x_list]
 )
 
-ATTRIBUTE_STATS_ROI = (1508, 358, 1700, 390)
-SECONDARY_STATS_ROI = (1508, 416, 1700, 448)
-SKILL_STATS_ROI = (1508, 468, 1700, 500)
+AREA = (1465, 79, 1883, 532)
+DEPRECATE_BUTTON_POS = (1807, 284)
+LOCK_BUTTON_POS = (1839, 286)
+DEPRECATE_BUTTON_ROI = (1790, 270, 1823, 302)
+LOCK_BUTTON_ROI = (1825, 270, 1857, 302)
+STATS_0_ROI = (1508, 358, 1700, 390)
+STATS_1_ROI = (1508, 416, 1700, 448)
+STATS_2_ROI = (1508, 468, 1700, 500)
 all_attribute_stats = ["敏捷提升", "力量提升", "意志提升", "智识提升", "主能力提升"]
 all_secondary_stats = [
     "攻击提升",
@@ -88,10 +102,18 @@ all_skill_stats = [
     "流转",
     "效益",
 ]
-recognizer = Recognizer(
+text_recognizer = Recognizer(
     labels=all_attribute_stats + all_secondary_stats + all_skill_stats,
     templates_dir=Path("templates"),
+    # preprocess_roi=preprocess_text_roi,
+    # preprocess_template=preprocess_text_template,
 )
+icon_recognizer = Recognizer(
+    labels=["deprecated", "not_deprecated", "locked", "not_locked"],
+    templates_dir=Path("screenshot_templates"),
+)
+
+weapons_data = json.loads(weapons_json_path.read_text(encoding="utf-8"))
 
 
 def get_active_support_window() -> pygetwindow.Window | None:
@@ -100,6 +122,14 @@ def get_active_support_window() -> pygetwindow.Window | None:
         return active_window
     else:
         return None
+
+
+def click_on_window(window: pygetwindow.Window, x: int, y: int) -> None:
+    """在指定窗口的客户区坐标 (x, y) 位置点击"""
+    client_rect = get_client_rect(window)
+    screen_x = client_rect["left"] + x
+    screen_y = client_rect["top"] + y
+    pyautogui.click(screen_x, screen_y)
 
 
 class EssenceScanner(threading.Thread):
@@ -135,25 +165,49 @@ class EssenceScanner(threading.Thread):
                 logger.info("基质扫描被中断。")
                 break
 
-            client_rect = get_client_rect(window)
-
-            # 点击坐标（icon_pos_grid 坐标是相对客户区左上角，需要转成屏幕坐标）
-            pyautogui.click(client_rect["left"] + rel_x, client_rect["top"] + rel_y)
+            click_on_window(window, rel_x, rel_y)
 
             # 等待短暂时间以确保界面更新
             time.sleep(0.3)
 
-            screenshot_image = screenshot_window(window, ATTRIBUTE_STATS_ROI)
-            result, max_val = recognizer.recognize_roi(screenshot_image)
-            logger.success(f"基础属性识别结果: {result} (置信度: {max_val:.3f})")
+            stats: list[str | None] = []
 
-            screenshot_image = screenshot_window(window, SECONDARY_STATS_ROI)
-            result, max_val = recognizer.recognize_roi(screenshot_image)
-            logger.success(f"附加属性识别结果: {result} (置信度: {max_val:.3f})")
+            for i, roi in enumerate([STATS_0_ROI, STATS_1_ROI, STATS_2_ROI]):
+                screenshot_image = screenshot_window(window, roi)
+                result, max_val = text_recognizer.recognize_roi(screenshot_image)
+                stats.append(result)
+                logger.success(f"属性 {i} 识别结果: {result} (置信度: {max_val:.3f})")
 
-            screenshot_image = screenshot_window(window, SKILL_STATS_ROI)
-            result, max_val = recognizer.recognize_roi(screenshot_image)
-            logger.success(f"技能属性识别结果: {result} (置信度: {max_val:.3f})")
+            screenshot_image = screenshot_window(window, DEPRECATE_BUTTON_ROI)
+            deprecated_str, max_val = icon_recognizer.recognize_roi(screenshot_image)
+            deprecated = deprecated_str == "deprecated"
+            logger.success(
+                f"废弃按钮识别结果: {deprecated_str} (置信度: {max_val:.3f})"
+            )
+
+            screenshot_image = screenshot_window(window, LOCK_BUTTON_ROI)
+            locked_str, max_val = icon_recognizer.recognize_roi(screenshot_image)
+            locked = locked_str == "locked"
+            logger.success(f"锁定按钮识别结果: {locked_str} (置信度: {max_val:.3f})")
+
+            for weapon_id, weapon_data in weapons_data.items():
+                if (
+                    weapon_data["stats"]["attribute"] == stats[0]
+                    and weapon_data["stats"]["secondary"] == stats[1]
+                    and weapon_data["stats"]["skill"] == stats[2]
+                ):
+                    logger.success(
+                        f"这个基质是宝贝，它匹配武器 {weapon_data['weaponName']} (ID: {weapon_id})。"
+                    )
+                    if not locked:
+                        logger.info("给你自动锁上...")
+                        click_on_window(window, *LOCK_BUTTON_POS)
+                    break
+            else:
+                logger.info("这个基质是垃圾，它不匹配任何已实装武器。")
+                if locked:
+                    logger.info("给你自动解锁...")
+                    click_on_window(window, *LOCK_BUTTON_POS)
 
             # datetime_str = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S_%f")
             # save_image(
@@ -177,28 +231,28 @@ def on_bracket_left():
     else:
         logger.info("检测到 '[' 键，开始截图...")
 
-        screenshot_image = screenshot_window(window, ATTRIBUTE_STATS_ROI)
+        screenshot_image = screenshot_window(window, STATS_0_ROI)
         save_image(
-            recognizer.preprocess_roi(screenshot_image),
+            text_recognizer.preprocess_roi(screenshot_image),
             screenshot_dir / "attribute_stats_roi.png",
         )
-        result, max_val = recognizer.recognize_roi(screenshot_image)
+        result, max_val = text_recognizer.recognize_roi(screenshot_image)
         logger.success(f"基础属性识别结果: {result} (置信度: {max_val:.3f})")
 
-        screenshot_image = screenshot_window(window, SECONDARY_STATS_ROI)
+        screenshot_image = screenshot_window(window, STATS_1_ROI)
         save_image(
-            recognizer.preprocess_roi(screenshot_image),
+            text_recognizer.preprocess_roi(screenshot_image),
             screenshot_dir / "secondary_stats_roi.png",
         )
-        result, max_val = recognizer.recognize_roi(screenshot_image)
+        result, max_val = text_recognizer.recognize_roi(screenshot_image)
         logger.success(f"附加属性识别结果: {result} (置信度: {max_val:.3f})")
 
-        screenshot_image = screenshot_window(window, SKILL_STATS_ROI)
+        screenshot_image = screenshot_window(window, STATS_2_ROI)
         save_image(
-            recognizer.preprocess_roi(screenshot_image),
+            text_recognizer.preprocess_roi(screenshot_image),
             screenshot_dir / "skill_stats_roi.png",
         )
-        result, max_val = recognizer.recognize_roi(screenshot_image)
+        result, max_val = text_recognizer.recognize_roi(screenshot_image)
         logger.success(f"技能属性识别结果: {result} (置信度: {max_val:.3f})")
 
 
