@@ -444,7 +444,7 @@ def main() -> None:
                             # 先截取 ROI 区域
                             roi_img = capture_client_roi_np(hwnd, BONUS_ROI)
                             if roi_img is not None:
-                                label, score = recognizer.recognize(roi_img)
+                                label, score = recognizer.recognize_roi(roi_img)
                                 if label:
                                     logging.info(
                                         f"Recognized: {label} (score={score:.3f})"

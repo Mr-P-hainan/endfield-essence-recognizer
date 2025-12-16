@@ -3,9 +3,15 @@
 import logging
 import threading
 import time
+from datetime import datetime
+from pathlib import Path
 
+import cv2
 import numpy as np
+import win32api
+import win32con
 import win32gui
+import win32ui
 
 from src.endfield_essence_recognizer.capture import (
     capture_client_roi_np,
@@ -24,6 +30,7 @@ icon_pos_grid = np.array(
 
 def is_supported_window(hwnd: int) -> bool:
     """检查窗口是否为支持的游戏窗口。"""
+
     try:
         title = win32gui.GetWindowText(hwnd)
         return title in ["EndfieldTBeta2"]
@@ -33,48 +40,10 @@ def is_supported_window(hwnd: int) -> bool:
 
 def send_left_click(x: int, y: int) -> None:
     """在指定屏幕坐标执行左键单击。"""
-    import win32api
-    import win32con
 
     win32api.SetCursorPos((x, y))
     win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, x, y, 0, 0)
     win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, x, y, 0, 0)
-
-
-def screenshot_client(hwnd: int) -> None:
-    """截取游戏窗口客户区。"""
-    from datetime import datetime
-    from pathlib import Path
-
-    import cv2
-    import win32con
-    import win32gui
-    import win32ui
-
-    _left, _top, width, height = get_client_rect_screen(hwnd)
-
-    hdc = win32gui.GetDC(hwnd)
-    mdc = win32ui.CreateDCFromHandle(hdc)
-    save_dc = mdc.CreateCompatibleDC()
-
-    save_bmp = win32ui.CreateBitmap()
-    save_bmp.CreateCompatibleBitmap(mdc, width, height)
-    save_dc.SelectObject(save_bmp)
-    save_dc.BitBlt((0, 0), (width, height), mdc, (0, 0), win32con.SRCCOPY)
-
-    # 转换为 numpy 数组
-    bmp_str = save_bmp.GetBitmapBits(True)
-    img_array = np.frombuffer(bmp_str, dtype=np.uint8).reshape(height, width, 4)
-    img_bgr = cv2.cvtColor(img_array, cv2.COLOR_BGRA2BGR)
-
-    # 保存截图
-    screenshots_dir = Path(__file__).parent / "screenshots"
-    screenshots_dir.mkdir(exist_ok=True)
-
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    filepath = screenshots_dir / f"screenshot_{timestamp}.png"
-    save_dc.DeleteDC()
-    win32gui.ReleaseDC(hwnd, hdc)
 
 
 class EssenceScanner(threading.Thread):
@@ -164,7 +133,7 @@ class EssenceScanner(threading.Thread):
                         # 截取 ROI 区域并识别属性文本
                         roi_img = capture_client_roi_np(hwnd, BONUS_ROI)
                         if roi_img is not None:
-                            label, score = self.recognizer.recognize(roi_img)
+                            label, score = self.recognizer.recognize_roi(roi_img)
                             if label:
                                 log_msg = (
                                     f"[{idx + 1:02d}/{len(icon_pos_grid)}] "
