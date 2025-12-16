@@ -8,9 +8,17 @@ from loguru import logger
 if TYPE_CHECKING:
     from loguru import Record
 
+# default_format: str = (
+#     '<dim>File <cyan>"{file.path}"</>, line <cyan>{line}</>, in <cyan>{function}</></>\n'
+#     "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</> "
+#     "[<level>{level}</>] "
+#     "<level><normal>{message}</></>"
+# )
+
 default_format: str = (
     '<dim>File <cyan>"{file.path}"</>, line <cyan>{line}</>, in <cyan>{function}</></>\n'
     "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</> "
+    '<cyan>"{file.path}"</>, line <cyan>{line}</>, in <cyan>{function}</>'
     "[<level>{level}</>] "
     "<level><normal>{message}</></>"
 )

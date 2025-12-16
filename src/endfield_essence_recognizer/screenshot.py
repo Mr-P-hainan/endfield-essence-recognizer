@@ -2,7 +2,6 @@
 
 import ctypes
 import ctypes.wintypes
-import logging
 
 import cv2
 import numpy as np
@@ -12,6 +11,7 @@ import win32con
 import win32gui
 import win32ui
 from cv2.typing import MatLike
+from loguru import logger
 
 from endfield_essence_recognizer.image import load_image
 
@@ -158,7 +158,9 @@ def screenshot_by_pyautogui(rect: tuple[int, int, int, int]) -> MatLike:
     return load_image(screenshot)
 
 
-def screenshot_window(window: pygetwindow.Window) -> MatLike:
+def screenshot_window(
+    window: pygetwindow.Window, relative_region: tuple[int, int, int, int] | None = None
+) -> MatLike:
     """
     截取指定窗口的客户区，返回 BGR 格式的 numpy 图像。
 
@@ -169,13 +171,17 @@ def screenshot_window(window: pygetwindow.Window) -> MatLike:
         numpy 数组（BGR 格式，OpenCV 兼容）
     """
     client_rect = get_client_rect(window)
-    rect = (
-        client_rect["left"],
-        client_rect["top"],
-        client_rect["right"],
-        client_rect["bottom"],
-    )
-    return screenshot_by_pyautogui(rect)
+    left = client_rect["left"]
+    top = client_rect["top"]
+    right = client_rect["right"]
+    bottom = client_rect["bottom"]
+    if relative_region is not None:
+        rx1, ry1, rx2, ry2 = relative_region
+        left += rx1
+        top += ry1
+        right = left + (rx2 - rx1)
+        bottom = top + (ry2 - ry1)
+    return screenshot_by_pyautogui((left, top, right, bottom))
 
 
 def capture_client_roi_np(
