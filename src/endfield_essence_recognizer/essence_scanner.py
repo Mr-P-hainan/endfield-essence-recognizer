@@ -1,0 +1,191 @@
+import threading
+import time
+from collections.abc import Container
+
+import numpy as np
+import pygetwindow
+
+from endfield_essence_recognizer.data import weapons
+from endfield_essence_recognizer.log import logger
+from endfield_essence_recognizer.recognizer import Recognizer
+from endfield_essence_recognizer.window import (
+    click_on_window,
+    get_active_support_window,
+    screenshot_window,
+)
+
+# 基质图标位置网格（客户区像素坐标）
+# 5 行 9 列，共 45 个图标位置
+essence_icon_x_list = np.linspace(128, 1374, 9).astype(int)
+essence_icon_y_list = np.linspace(196, 819, 5).astype(int)
+
+# 识别相关常量
+RESOLUTION = (1920, 1080)
+AREA = (1465, 79, 1883, 532)
+DEPRECATE_BUTTON_POS = (1807, 284)
+"""弃用按钮点击坐标"""
+LOCK_BUTTON_POS = (1839, 286)
+"""锁定按钮点击坐标"""
+DEPRECATE_BUTTON_ROI = (1790, 270, 1823, 302)
+"""弃用按钮截图区域"""
+LOCK_BUTTON_ROI = (1825, 270, 1857, 302)
+"""锁定按钮截图区域"""
+STATS_0_ROI = (1508, 358, 1700, 390)
+"""属性 0 截图区域"""
+STATS_1_ROI = (1508, 416, 1700, 448)
+"""属性 1 截图区域"""
+STATS_2_ROI = (1508, 468, 1700, 500)
+"""属性 2 截图区域"""
+
+
+def recognize_once(
+    window: pygetwindow.Window,
+    text_recognizer: Recognizer,
+    icon_recognizer: Recognizer,
+) -> None:
+    stats: list[str | None] = []
+
+    for k, roi in enumerate([STATS_0_ROI, STATS_1_ROI, STATS_2_ROI]):
+        screenshot_image = screenshot_window(window, roi)
+        result, max_val = text_recognizer.recognize_roi(screenshot_image)
+        stats.append(result)
+        logger.debug(f"属性 {k} 识别结果: {result} (分数: {max_val:.3f})")
+
+    screenshot_image = screenshot_window(window, DEPRECATE_BUTTON_ROI)
+    deprecated_str, max_val = icon_recognizer.recognize_roi(screenshot_image)
+    deprecated = deprecated_str == "deprecated"
+    logger.debug(f"废弃按钮识别结果: {deprecated_str} (分数: {max_val:.3f})")
+
+    screenshot_image = screenshot_window(window, LOCK_BUTTON_ROI)
+    locked_str, max_val = icon_recognizer.recognize_roi(screenshot_image)
+    locked = locked_str == "locked"
+    logger.debug(f"锁定按钮识别结果: {locked_str} (分数: {max_val:.3f})")
+
+    logger.opt(colors=True).info(
+        f"已识别当前基质，属性: <magenta>{stats}</>, 废弃: <magenta>{deprecated}</>, 锁定: <magenta>{locked}</>"
+    )
+
+    for weapon_id, weapon_data in weapons.items():
+        if (
+            weapon_data["stats"]["attribute"] == stats[0]
+            and weapon_data["stats"]["secondary"] == stats[1]
+            and weapon_data["stats"]["skill"] == stats[2]
+        ):
+            logger.opt(colors=True).success(
+                f"这个基质是<green><bold><underline>宝藏</></></>，它完美契合武器<bold>{weapon_data['weaponName']}</>。"
+            )
+            break
+    else:
+        logger.opt(colors=True).success(
+            "这个基质是<red><bold><underline>垃圾</></></>，它不匹配任何已实装武器。"
+        )
+
+
+class EssenceScanner(threading.Thread):
+    """
+    基质图标扫描器后台线程。
+
+    此线程负责自动遍历游戏界面中的 45 个基质图标位置，
+    对每个位置执行"点击 -> 截图 -> 识别"的流程。
+    """
+
+    def __init__(
+        self,
+        text_recognizer: Recognizer,
+        icon_recognizer: Recognizer,
+        supported_window_titles: Container[str],
+    ) -> None:
+        super().__init__(daemon=True)
+        self._scanning = threading.Event()
+        self._text_recognizer: Recognizer = text_recognizer
+        self._icon_recognizer: Recognizer = icon_recognizer
+        self._supported_window_titles: Container[str] = supported_window_titles
+
+    def run(self) -> None:
+        logger.info("开始基质扫描线程...")
+        self._scanning.set()
+        for i, j in np.ndindex(len(essence_icon_y_list), len(essence_icon_x_list)):
+            relative_x = essence_icon_x_list[j]
+            relative_y = essence_icon_y_list[i]
+
+            window = get_active_support_window(self._supported_window_titles)
+            if window is None:
+                logger.info("终末地窗口不在前台，停止基质扫描。")
+                self._scanning.clear()
+                break
+
+            if not self._scanning.is_set():
+                logger.info("基质扫描被中断。")
+                break
+
+            click_on_window(window, relative_x, relative_y)
+
+            # 等待短暂时间以确保界面更新
+            time.sleep(0.3)
+
+            stats: list[str | None] = []
+
+            for k, roi in enumerate([STATS_0_ROI, STATS_1_ROI, STATS_2_ROI]):
+                screenshot_image = screenshot_window(window, roi)
+                result, max_val = self._text_recognizer.recognize_roi(screenshot_image)
+                stats.append(result)
+                logger.debug(
+                    f"第 {i + 1} 行第 {j + 1} 列基质的属性 {k} 识别结果: {result} (分数: {max_val:.3f})"
+                )
+
+            screenshot_image = screenshot_window(window, DEPRECATE_BUTTON_ROI)
+            deprecated_str, max_val = self._icon_recognizer.recognize_roi(
+                screenshot_image
+            )
+            deprecated = deprecated_str == "deprecated"
+            logger.debug(
+                f"第 {i + 1} 行第 {j + 1} 列基质的废弃按钮识别结果: {deprecated_str} (分数: {max_val:.3f})"
+            )
+
+            screenshot_image = screenshot_window(window, LOCK_BUTTON_ROI)
+            locked_str, max_val = self._icon_recognizer.recognize_roi(screenshot_image)
+            locked = locked_str == "locked"
+            logger.debug(
+                f"第 {i + 1} 行第 {j + 1} 列基质的锁定按钮识别结果: {locked_str} (分数: {max_val:.3f})"
+            )
+
+            logger.opt(colors=True).info(
+                f"已识别第 {i + 1} 行第 {j + 1} 列的基质，属性: <magenta>{stats}</>, 废弃: <magenta>{deprecated}</>, 锁定: <magenta>{locked}</>"
+            )
+
+            for weapon_id, weapon_data in weapons.items():
+                if (
+                    weapon_data["stats"]["attribute"] == stats[0]
+                    and weapon_data["stats"]["secondary"] == stats[1]
+                    and weapon_data["stats"]["skill"] == stats[2]
+                ):
+                    logger.opt(colors=True).success(
+                        f"第 {i + 1} 行第 {j + 1} 列的基质是<green><bold><underline>宝藏</></></>，它完美契合武器<bold>{weapon_data['weaponName']}</>。"
+                    )
+                    if not locked:
+                        click_on_window(window, *LOCK_BUTTON_POS)
+                    logger.success("给你自动锁上了，记得保管好哦！(*/ω＼*)")
+                    break
+            else:
+                logger.opt(colors=True).success(
+                    f"第 {i + 1} 行第 {j + 1} 列的基质是<red><bold><underline>垃圾</></></>，它不匹配任何已实装武器。"
+                )
+                if locked:
+                    click_on_window(window, *LOCK_BUTTON_POS)
+                logger.success("给你自动解锁了，可以放心当狗粮用啦！ヾ(≧▽≦*)o")
+
+            # datetime_str = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S_%f")
+            # save_image(
+            #     screenshot_image,
+            #     screenshot_dir / f"essence_scan_{datetime_str}.png",
+            # )
+
+            time.sleep(0.0)
+
+        else:
+            # 扫描完成
+            logger.info("基质扫描完成。")
+
+    def stop(self) -> None:
+        logger.info("停止基质扫描线程...")
+        self._scanning.clear()

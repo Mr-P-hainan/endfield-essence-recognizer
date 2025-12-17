@@ -1,6 +1,4 @@
-from endfield_essence_recognizer import auto_control
-
-main = auto_control.main
+from endfield_essence_recognizer import main
 
 if __name__ == "__main__":
     main()

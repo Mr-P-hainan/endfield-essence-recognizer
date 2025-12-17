@@ -11,13 +11,19 @@ from loguru import logger
 #     "<level><normal>{message}</></>"
 # )
 
+# default_format: str = (
+#     "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</> "
+#     "[<level>{level}</>] "
+#     "<cyan>{module}</>:<cyan>{function}</>:<cyan>{line}</> | "
+#     "<level><normal>{message}</></>"
+# )
+
 default_format: str = (
-    "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</> "
+    "<green>{time:MM-DD HH:mm:ss}</> "
     "[<level>{level}</>] "
-    "<cyan>{module}</>:<cyan>{function}</>:<cyan>{line}</> | "
+    "<cyan>{module}</>:<cyan>{line}</> | "
     "<level><normal>{message}</></>"
 )
-
 
 logger.remove()
 logger.add(

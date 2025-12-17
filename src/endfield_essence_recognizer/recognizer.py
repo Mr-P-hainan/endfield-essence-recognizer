@@ -14,8 +14,8 @@ from endfield_essence_recognizer.image import (
 from endfield_essence_recognizer.log import logger
 
 # 识别阈值（默认值，可在 Recognizer 中覆盖）
-HIGH_THRESH = 0.75  # 高置信度阈值：超过此值直接判定
-LOW_THRESH = 0.50  # 低置信度阈值：低于此值判定为未知
+HIGH_THRESH = 0.75  # 高分数阈值：超过此值直接判定
+LOW_THRESH = 0.50  # 低分数阈值：低于此值判定为未知
 
 
 def preprocess_text_roi(roi_image: MatLike) -> MatLike:
@@ -81,17 +81,17 @@ class Recognizer:
                     except Exception as e:
                         logger.error(f"加载模板图像失败 {path}: {e}")
             if not self._templates[label]:
-                logger.error(f"在 {self.templates_dir} 中未找到标签 '{label}' 的模板")
+                logger.error(f'在 {self.templates_dir} 中未找到标签 "{label}" 的模板')
 
     def recognize_roi(self, roi_image: MatLike) -> tuple[str | None, float]:
         """
-        识别 ROI 图像中的短语，返回 (标签, 置信度)。
+        识别 ROI 图像中的短语，返回 (标签, 分数)。
 
         Args:
             roi_img: ROI 区域的图像（OpenCV 格式）
 
         Returns:
-            (标签, 置信度) 元组。如果无法识别，返回 (None, best_score)。
+            (标签, 分数) 元组。如果无法识别，返回 (None, best_score)。
         """
 
         if not self._templates:
@@ -113,7 +113,7 @@ class Recognizer:
                     continue
                 result = cv2.matchTemplate(gray, template, cv2.TM_CCOEFF_NORMED)
                 _minVal, maxVal, _minLoc, _maxLoc = cv2.minMaxLoc(result)
-                logger.trace(f"模板匹配: 标签={label} 最大值={maxVal:.3f}")
+                logger.trace(f"模板匹配: 最佳匹配={label} 分数={maxVal:.3f}")
                 if maxVal > best_score:
                     best_score = maxVal
                     best_label = label
@@ -121,8 +121,12 @@ class Recognizer:
         if best_score >= self.high_thresh:
             return best_label, float(best_score)
         elif best_score >= self.low_thresh:
-            logger.warning(f"匹配置信水平较低: 标签={best_label} 分数={best_score:.3f}")
+            logger.warning(
+                f"匹配置信水平较低: 最佳匹配={best_label} 分数={best_score:.3f}"
+            )
             return best_label, float(best_score)
         else:
-            logger.warning(f"匹配置信水平很低: 标签={best_label} 分数={best_score:.3f}")
+            logger.warning(
+                f"匹配置信水平很低: 最佳匹配={best_label} 分数={best_score:.3f}"
+            )
             return None, float(best_score)
