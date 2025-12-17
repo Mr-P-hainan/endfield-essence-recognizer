@@ -70,7 +70,7 @@ def recognize_once(
             and weapon_data["stats"]["skill"] == stats[2]
         ):
             logger.opt(colors=True).success(
-                f"这个基质是<green><bold><underline>宝藏</></></>，它完美契合武器<bold>{weapon_data['weaponName']}</>。"
+                f"这个基质是<green><bold><underline>宝藏</></></>，它完美契合武器<bold>{weapon_data['weaponName']}（{weapon_data['rarity']}★ {weapon_data['weaponType']}）</>。"
             )
             break
     else:
