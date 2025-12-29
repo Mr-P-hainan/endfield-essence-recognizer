@@ -75,6 +75,12 @@ const router = createRouter({
       component: () => import('@/pages/yituliu.vue'),
       meta: { title: '终末地一图流', icon: 'mdi-map' },
     },
+    {
+      path: '/logs',
+      name: 'logs',
+      component: () => import('@/pages/logs.vue'),
+      meta: { title: '日志', icon: 'mdi-file-document-outline' },
+    },
   ],
 })
 

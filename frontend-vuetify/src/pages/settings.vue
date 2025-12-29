@@ -1,6 +1,6 @@
 <template>
   <v-container>
-    <v-expansion-panels multiple :model-value="[0, 1, 2]" color="secondary">
+    <v-expansion-panels color="primary-darken-1" :model-value="[0, 1, 2]" multiple>
       <v-expansion-panel :value="0">
         <v-expansion-panel-title>武器基质预设</v-expansion-panel-title>
         <v-expansion-panel-text>
@@ -8,11 +8,11 @@
           <template v-for="weaponType in weaponTypes" :key="weaponType">
             <h3>
               <v-checkbox
-                :model-value="isAllSelected(weaponType)"
-                :indeterminate="isPartiallySelected(weaponType)"
-                @click="selectAllForType(weaponType, !isAllSelected(weaponType))"
                 density="compact"
                 hide-details
+                :indeterminate="isPartiallySelected(weaponType)"
+                :model-value="isAllSelected(weaponType)"
+                @click="selectAllForType(weaponType, !isAllSelected(weaponType))"
               >
                 <template #prepend>
                   <h3 style="margin: 0">{{ weaponType }}</h3>
@@ -26,8 +26,8 @@
                 )"
                 :key="weaponId"
                 v-model="selectedWeaponIds"
-                density="comfortable"
                 color="primary"
+                density="comfortable"
                 hide-details
                 :label="weapon.weaponName"
                 :value="weaponId"
@@ -65,35 +65,35 @@
         <v-expansion-panel-title>自定义宝藏基质</v-expansion-panel-title>
         <v-expansion-panel-text>
           <h2>额外将以下属性的基质视为宝藏</h2>
-          <v-alert v-if="false" type="info" variant="tonal" border="start" class="my-4">
+          <v-alert v-if="false" border="start" class="my-4" type="info" variant="tonal">
             请点击右侧（或者下方）的加号按钮添加新的基质属性行，点击删除按钮删除对应行。上下箭头按钮可调整行顺序。
           </v-alert>
           <v-row v-for="(essenceStat, index) in treasureEssenceStats" :key="index" align="center">
             <v-col cols="12" sm="6" md="3">
               <v-text-field
                 v-model="essenceStat.attribute"
-                variant="outlined"
                 density="comfortable"
-                label="基础属性"
                 hide-details
+                label="基础属性"
+                variant="outlined"
               />
             </v-col>
             <v-col cols="12" sm="6" md="3">
               <v-text-field
                 v-model="essenceStat.secondary"
-                variant="outlined"
                 density="comfortable"
-                label="附加属性"
                 hide-details
+                label="附加属性"
+                variant="outlined"
               />
             </v-col>
             <v-col cols="12" sm="6" md="3">
               <v-text-field
                 v-model="essenceStat.skill"
-                variant="outlined"
                 density="comfortable"
-                label="技能属性"
                 hide-details
+                label="技能属性"
+                variant="outlined"
               />
             </v-col>
             <v-col cols="12" sm="6" md="3">
@@ -121,7 +121,7 @@
                 variant="text"
                 @click="
                   () => {
-                    const stat = treasureEssenceStats.splice(index, 1)[0]
+                    const stat = treasureEssenceStats.splice(index, 1)[0]!
                     treasureEssenceStats.splice(index - 1, 0, stat)
                   }
                 "
@@ -132,19 +132,18 @@
                 variant="text"
                 @click="
                   () => {
-                    const stat = treasureEssenceStats.splice(index, 1)[0]
+                    const stat = treasureEssenceStats.splice(index, 1)[0]!
                     treasureEssenceStats.splice(index + 1, 0, stat)
                   }
                 "
               />
             </v-col>
           </v-row>
-          <v-row class="my-4" v-if="treasureEssenceStats.length === 0">
+          <v-row v-if="treasureEssenceStats.length === 0" class="my-4">
             <v-col cols="12" sm="6" md="9">
               <v-btn
                 color="primary"
                 prepend-icon="mdi-plus"
-                variant="tonal"
                 @click="treasureEssenceStats.push({ attribute: '', secondary: '', skill: '' })"
               >
                 添加自定义宝藏基质
@@ -171,7 +170,7 @@
           <v-row>
             <v-col cols="12" md="6">
               <h3>对于<span class="text-success">宝藏基质</span>，我们</h3>
-              <v-radio-group v-model="treasureAction" density="comfortable" color="primary">
+              <v-radio-group v-model="treasureAction" color="primary" density="comfortable">
                 <v-radio label="不去动它" value="keep" />
                 <v-radio label="把它锁上" value="lock" />
                 <v-radio label="把它标记为弃用" value="deprecate" disabled />
@@ -182,13 +181,13 @@
             </v-col>
             <v-col cols="12" md="6">
               <h3>对于<span class="text-error">垃圾基质</span>，我们</h3>
-              <v-radio-group v-model="trashAction" density="comfortable" color="primary">
+              <v-radio-group v-model="trashAction" color="primary" density="comfortable">
                 <v-radio label="不去动它" value="keep" />
                 <v-radio label="把它锁上" value="lock" />
                 <v-radio label="把它标记为弃用" value="deprecate" />
-                <v-radio label="如果锁着，则解锁" value="unlock"></v-radio>
+                <v-radio label="如果锁着，则解锁" value="unlock" />
                 <v-radio label="如果已标记为弃用，则取消弃用" value="undeprecate" />
-                <v-radio label="解锁且取消弃用" value="unlock_and_undeprecate"></v-radio>
+                <v-radio label="解锁且取消弃用" value="unlock_and_undeprecate" />
               </v-radio-group>
             </v-col>
           </v-row>
@@ -263,16 +262,15 @@ const config = computed(() => {
 })
 
 async function getWeapons() {
-  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/weapons`)
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/weapons`)
   const result = await response.json()
   weapons.value = result
 }
 
 async function getConfig() {
-  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/config`)
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/config`)
   const result = await response.json()
-  const { version, trash_weapon_ids, treasure_essence_stats, treasure_action, trash_action } =
-    result
+  const { trash_weapon_ids, treasure_essence_stats, treasure_action, trash_action } = result
   treasureEssenceStats.value = treasure_essence_stats
   treasureAction.value = treasure_action
   trashAction.value = trash_action
@@ -282,7 +280,7 @@ async function getConfig() {
 }
 
 async function postConfig() {
-  await fetch(`${import.meta.env.VITE_API_BASE_URL}/config`, {
+  await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/config`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

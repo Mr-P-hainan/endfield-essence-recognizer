@@ -1,20 +1,19 @@
+import asyncio
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
-from threading import Thread
 from typing import Any, Literal
 
 import uvicorn
 import webview
 from dotenv import load_dotenv
-from fastapi import APIRouter, Body, FastAPI, Request
+from fastapi import APIRouter, Body, FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
 
-from endfield_essence_recognizer import supported_window_titles
+from endfield_essence_recognizer import on_bracket_right, supported_window_titles
 from endfield_essence_recognizer.data import Weapons, weapons
-from endfield_essence_recognizer.log import logger
+from endfield_essence_recognizer.log import logger, websocket_handler
 
 # 加载 .env 文件
 load_dotenv()
@@ -28,62 +27,56 @@ prod_url = f"http://{api_host}:{api_port}"
 webview_url = dev_url if is_dev else prod_url
 
 
-# 定义API路由
-router = APIRouter()
+async def broadcast_logs():
+    """异步任务，持续监听日志队列并广播日志消息"""
+    await connection_event.wait()
+    while True:
+        message = await websocket_handler.log_queue.get()
+        disconnected_connections = set()
+        for connection in websocket_connections:
+            try:
+                await connection.send_text(message)
+            except WebSocketDisconnect:
+                disconnected_connections.add(connection)
+            except Exception as e:
+                logger.error(f"发送日志到 WebSocket 连接时出错：{e}")
+                disconnected_connections.add(connection)
+        for dc in disconnected_connections:
+            websocket_connections.remove(dc)
 
 
-# 定义请求体模型
-class TestRequest(BaseModel):
-    code: int
-    message: str
-    data: Any
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global task
+    task = asyncio.create_task(broadcast_logs())
+    yield
+    if task:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
-# @router.api_route(
-#     "/{path:path}",
-#     methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
-# )
-# async def proxy_yituliu(path: str, request: Request):
-#     import urllib.request
-
-#     url = f"https://ef.yituliu.cn/{path}"
-#     query_params = str(request.url.query)
-#     if query_params:
-#         url += f"?{query_params}"
-
-#     headers = {key: value for key, value in request.headers.items() if key != "host"}
-
-#     with urllib.request.urlopen(
-#         urllib.request.Request(
-#             url,
-#             data=await request.body()
-#             if request.method in ("POST", "PUT", "PATCH")
-#             else None,
-#             headers=headers,
-#             method=request.method,
-#         )
-#     ) as response:
-#         content = response.read()
-#         return StreamingResponse(
-#             content=iter([content]),
-#             status_code=response.status,
-#             headers=dict(response.getheaders()),
-#         )
+router = APIRouter(lifespan=lifespan)
+websocket_connections: set[WebSocket] = set()
+task: asyncio.Task | None = None
+connection_event = asyncio.Event()
 
 
-@router.get("/weapons")
+@router.get("/api/weapons")
 async def get_weapons() -> Weapons:
     return weapons
 
 
-@router.get("/config")
+@router.get("/api/config")
 async def get_config() -> dict[str, Any]:
     from endfield_essence_recognizer.config import config
 
     return config.model_dump()
 
 
-@router.post("/config")
+@router.post("/api/config")
 async def post_config(new_config: dict[str, Any] = Body()) -> dict[str, Any]:
     from endfield_essence_recognizer.config import config
 
@@ -92,7 +85,7 @@ async def post_config(new_config: dict[str, Any] = Body()) -> dict[str, Any]:
     return config.model_dump()
 
 
-@router.get("/screenshot")
+@router.get("/api/screenshot")
 async def get_screenshot(
     width: int = 1920,
     height: int = 1080,
@@ -141,10 +134,29 @@ async def get_screenshot(
     return f"data:{mime_type};base64,{base64_string}"
 
 
-# 初始化FastAPI应用
+@router.post("/api/start_scanning")
+async def start_scanning():
+    on_bracket_right()
+
+
+@router.websocket("/ws/logs")
+async def websocket_logs(websocket: WebSocket):
+    await websocket.accept()
+    websocket_connections.add(websocket)
+    connection_event.set()
+    logger.info("WebSocket 日志连接已建立。")
+    try:
+        while True:
+            await websocket.receive()
+    except WebSocketDisconnect:
+        websocket_connections.remove(websocket)
+        logger.info("WebSocket 日志连接已断开。")
+    except Exception as e:
+        logger.error(f"WebSocket 日志连接出错：{e}")
+
+
 app = FastAPI()
 
-# 配置跨域（开发环境需允许Vite的3000端口）
 app.add_middleware(
     CORSMiddleware,  # ty:ignore[invalid-argument-type]
     allow_origins=["*"],  # 生产环境可指定具体域名
@@ -193,10 +205,13 @@ def start_api_server(host: str, port: int):
             "uvicorn.access": {"handlers": ["default"], "level": "INFO"},
         },
     }
-    uvicorn.run(app=app, host=host, port=port, log_config=LOGGING_CONFIG)
+    config = uvicorn.Config(app=app, host=host, port=port, log_config=LOGGING_CONFIG)
+    server = uvicorn.Server(config)
+    server.run()
 
 
 if __name__ == "__main__":
-    api_thread = Thread(target=start_api_server, args=(api_host, api_port), daemon=True)
-    api_thread.start()
+    # api_thread = Thread(target=start_api_server, args=(api_host, api_port), daemon=True)
+    # api_thread.start()
+    asyncio.run(start_api_server(api_host, api_port))
     start_pywebview(webview_url)

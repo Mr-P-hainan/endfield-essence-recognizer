@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import inspect
 import logging
 import sys
@@ -45,6 +46,19 @@ class LoguruHandler(logging.Handler):  # pragma: no cover
         )
 
 
+class WebSocketHandler:
+    """将日志发送到 WebSocket 连接的处理器"""
+
+    def __init__(self):
+        self.log_queue: asyncio.Queue[str] = asyncio.Queue()
+
+    def write(self, message: str):
+        self.log_queue.put_nowait(message)
+
+
+websocket_handler = WebSocketHandler()
+
+
 logger.remove()
 logger.add(
     sys.stderr,
@@ -57,4 +71,9 @@ logger.add(
     level="TRACE",
     format=file_log_format,
     diagnose=True,
+)
+logger.add(
+    websocket_handler,
+    level="INFO",
+    format=console_log_format,
 )

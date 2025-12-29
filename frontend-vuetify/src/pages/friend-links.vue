@@ -77,7 +77,7 @@ async function fetchLinks(): Promise<void> {
       throw new Error(`API 错误: ${data.message}`)
     }
 
-    links.value = [...data.data, ...extraFriendLinks]
+    links.value = [...extraFriendLinks, ...data.data]
   } catch (err) {
     error.value = err instanceof Error ? err.message : '获取数据失败'
     console.error('获取友情链接失败:', err)
@@ -93,199 +93,80 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="links-view">
+  <v-container>
     <h1>友情链接</h1>
 
     <!-- 加载状态 -->
-    <div v-if="loading" class="loading-state">
-      <div class="loading-spinner"></div>
+    <div v-if="loading" class="d-flex flex-column justify-center align-center gr-4 my-8">
+      <v-progress-circular color="primary" indeterminate size="40" />
       <p>加载中……</p>
     </div>
 
     <!-- 错误状态 -->
-    <div v-else-if="error" class="error-state">
-      <p class="error-message">❌ {{ error }}</p>
-      <button @click="fetchLinks" class="retry-button">重试</button>
+    <div v-else-if="error" class="d-flex flex-column justify-center align-center gr-4 my-8">
+      <v-alert type="error">
+        {{ error }}
+      </v-alert>
+      <v-btn color="primary" @click="fetchLinks">重试</v-btn>
     </div>
 
     <!-- 正常状态 -->
-    <div v-else class="links-grid">
-      <div v-for="link in links" :key="link.id" class="friend-link-card">
-        <!-- 图标和标题 -->
-        <div class="card-header">
-          <img
-            v-if="link.icon_url"
-            :src="link.icon_url"
-            :alt="`${link.localized_name.zh_CN}图标`"
-            class="link-icon"
-          />
-          <span class="link-name">{{ link.localized_name.zh_CN }}</span>
-        </div>
-
-        <!-- 标签 -->
-        <div v-if="link.localized_tags.zh_CN.length" class="link-tags">
-          <div v-for="(tag, index) in link.localized_tags.zh_CN" :key="index" class="tag">
-            {{ tag }}
+    <v-row v-else>
+      <v-col v-for="link in links" :key="link.id" cols="12" sm="6" lg="4" xl="3" class="d-flex">
+        <v-card class="flex-grow-1 d-flex flex-column gr-6 pa-8" rounded="xl" hover>
+          <div class="d-flex flex-row align-center gc-4">
+            <v-avatar rounded size="48">
+              <v-img
+                v-if="link.icon_url"
+                :alt="`${link.localized_name.zh_CN}图标`"
+                :src="link.icon_url"
+              />
+              <v-icon v-else>mdi-link</v-icon>
+            </v-avatar>
+            <h2 class="font-weight-bold my-0">{{ link.localized_name.zh_CN }}</h2>
           </div>
-        </div>
 
-        <!-- 描述 -->
-        <div class="link-description">{{ link.localized_description.zh_CN }}</div>
+          <!-- 标签 -->
+          <v-chip-group v-if="link.localized_tags.zh_CN.length > 0" column>
+            <v-chip v-for="(tag, index) in link.localized_tags.zh_CN" :key="index">
+              {{ tag }}
+            </v-chip>
+          </v-chip-group>
 
-        <!-- 标语 -->
-        <div v-if="link.localized_slogan.zh_CN" class="link-slogan">
-          {{ link.localized_slogan.zh_CN }}
-        </div>
+          <!-- 描述 -->
+          <p class="text-pre-wrap my-0 opacity-80">{{ link.localized_description.zh_CN }}</p>
 
-        <!-- 链接按钮 -->
-        <div class="link-buttons">
-          <a
-            v-for="(linkItem, index) in link.links"
-            :key="index"
-            :href="linkItem.url"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <v-btn class="link-button" :class="{ primary: linkItem.primary }">
-              {{ linkItem.localized_name.zh_CN }}<ExternalIcon />
+          <!-- 标语 -->
+          <div v-if="link.localized_slogan.zh_CN">
+            <v-divider />
+            <p class="text-primary my-2 text-pre-wrap font-weight-medium">
+              <i>{{ link.localized_slogan.zh_CN }}</i>
+            </p>
+            <v-divider />
+          </div>
+
+          <!-- 链接按钮 -->
+          <div class="mt-auto d-flex flex-row flex-wrap ga-2">
+            <v-btn
+              v-for="(linkItem, index) in link.links"
+              :key="index"
+              append-icon="mdi-open-in-new"
+              color="primary"
+              :href="linkItem.url"
+              rel="noopener noreferrer"
+              target="_blank"
+              :variant="linkItem.primary ? 'flat' : 'outlined'"
+            >
+              {{ linkItem.localized_name.zh_CN }}
             </v-btn>
-          </a>
-        </div>
-      </div>
-    </div>
-  </div>
+          </div>
+        </v-card>
+      </v-col>
+    </v-row>
+  </v-container>
 </template>
 
 <style scoped lang="scss">
-h1 {
-  text-align: center;
-}
-
-// 加载状态
-.loading-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 4em 2em;
-}
-
-.loading-spinner {
-  width: 3em;
-  height: 3em;
-  border: 3px solid gray;
-  border-top-color: white;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-// 错误状态
-.error-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 4em 2em;
-  text-align: center;
-}
-
-.error-message {
-  color: #ef4444;
-}
-
-// 正常状态
-.links-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 2em;
-}
-
-.friend-link-card {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5em;
-  background-color: var(--color-background-light);
-  border: 1px solid var(--color-border);
-  border-radius: 1em;
-  padding: 1.5em;
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  gap: 1em;
-}
-
-.link-icon {
-  width: 3.5em;
-  height: 3.5em;
-  border-radius: 0.5em;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-
-.link-name {
-  flex: 1;
-  font-size: 1.5em;
-  font-weight: bold;
-  line-height: 1.3;
-  overflow-wrap: anywhere;
-}
-
-.link-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75em 0.5em;
-}
-
-.tag {
-  padding: 0.375em 1em;
-  background-color: var(--color-background);
-  border-radius: 999999px;
-  font-size: 0.8em;
-  color: var(--color-text-light);
-}
-
-.link-description {
-  color: var(--color-text-light);
-  flex: 1;
-}
-
-.link-slogan {
-  font-size: var(--font-size-xs);
-  color: var(--color-primary);
-  font-weight: 500;
-  font-style: italic;
-}
-
-.link-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75em;
-}
-
-.link-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5em;
-  text-align: start;
-  font-weight: 500;
-}
-
-.external-icon {
-  width: 1em;
-  height: 1em;
-  opacity: 0.6;
-}
-
-.link-button:hover .external-icon {
-  opacity: 0.9;
-}
+// 如果需要自定义样式，可以在这里添加
+// 目前使用Vuetify的组件和utility classes，无需额外样式
 </style>

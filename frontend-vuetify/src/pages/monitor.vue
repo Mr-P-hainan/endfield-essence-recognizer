@@ -4,79 +4,79 @@
       <v-col cols="12" sm="6" xl="3">
         <v-number-input
           v-model="width"
-          controlVariant="split"
-          variant="outlined"
+          control-variant="split"
           density="comfortable"
-          label="宽度"
           hide-details
+          label="宽度"
+          variant="outlined"
         />
       </v-col>
       <v-col cols="12" sm="6" xl="3">
         <v-number-input
           v-model="height"
-          controlVariant="split"
-          variant="outlined"
+          control-variant="split"
           density="comfortable"
-          label="高度"
           hide-details
+          label="高度"
+          variant="outlined"
         />
       </v-col>
       <v-col cols="12" md="6" xl="3">
         <v-select
           v-model="format"
-          variant="outlined"
           density="comfortable"
+          hide-details
           :items="['jpg', 'png', 'webp']"
           label="格式"
-          hide-details
+          variant="outlined"
         />
       </v-col>
       <v-col cols="12" md="6" xl="3">
         <v-slider
           v-model="quality"
-          variant="outlined"
           density="comfortable"
-          label="质量"
-          :min="1"
-          :max="100"
-          :step="1"
           :disabled="['png'].includes(format)"
           hide-details
+          label="质量"
+          :max="100"
+          :min="1"
+          :step="1"
+          variant="outlined"
         >
           <template #append>
             <v-number-input
               v-model="quality"
-              controlVariant="split"
-              variant="outlined"
+              control-variant="split"
               density="comfortable"
               hide-details
               :step="1"
+              variant="outlined"
             />
           </template>
         </v-slider>
       </v-col>
     </v-row>
     <div class="my-4">
-      <v-slider v-model="interval" :min="0" :max="1" label="截图间隔（秒）" hide-details>
+      <v-slider v-model="interval" hide-details label="截图间隔（秒）" :max="1" :min="0">
         <template #append>
           <v-number-input
             v-model="interval"
-            controlVariant="split"
-            variant="outlined"
+            control-variant="split"
             density="comfortable"
             hide-details
-            :step="0.1"
             :precision="null"
+            :step="0.1"
+            variant="outlined"
           />
         </template>
       </v-slider>
     </div>
-    <img :src="screenshotUrl" alt="Screenshot" class="my-4" style="max-width: 100%; height: auto" />
+    <img alt="Screenshot" class="my-4" :src="screenshotUrl" style="max-width: 100%; height: auto" />
   </v-container>
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 
 const interval = ref<number>(0.1)
 const width = ref<number>(1920)
@@ -87,14 +87,15 @@ const screenshotUrl = ref<string>('')
 
 let timer: number | null = null
 
-const updateScreenshot = async () => {
+async function updateScreenshot() {
   const params = new URLSearchParams({
     width: width.value.toString(),
     height: height.value.toString(),
     format: format.value,
     quality: quality.value.toString(),
+    timestamp: Date.now().toString(),
   })
-  const url = `${import.meta.env.VITE_API_BASE_URL}/screenshot?${params.toString()}&t=${Date.now()}`
+  const url = `${import.meta.env.VITE_API_BASE_URL}/api/screenshot?${params.toString()}`
   // const oldUrl = screenshotUrl.value
   // fetch(url)
   //   .then((response) => response.blob())
@@ -117,7 +118,7 @@ const updateScreenshot = async () => {
     })
 }
 
-const startTimer = () => {
+function startTimer() {
   if (timer) clearInterval(timer)
   if (interval.value > 0) {
     timer = window.setInterval(updateScreenshot, interval.value * 1000)

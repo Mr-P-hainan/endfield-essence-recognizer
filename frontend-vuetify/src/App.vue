@@ -1,7 +1,7 @@
 <template>
   <v-app>
     <v-navigation-drawer v-model="drawer">
-      <v-card to="/" variant="flat" class="pa-4">
+      <v-card to="/" variant="flat" class="pa-4" rounded="0">
         <h1 class="text-center ma-4">终末地基质<br />妙妙小工具</h1>
       </v-card>
       <v-divider />
@@ -36,18 +36,16 @@
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTheme } from 'vuetify'
+import { useLogs } from '@/composables/useLogs'
 
 const route = useRoute()
 const router = useRouter()
-
 const theme = useTheme()
 
 const drawer = ref<boolean | null>(null)
+
+// 初始化日志 WebSocket 连接
+useLogs()
 </script>
 
-<style scoped lang="scss">
-.router-link {
-  text-decoration: none;
-  color: var(--v-theme-on-surface);
-}
-</style>
+<style scoped lang="scss"></style>

@@ -192,8 +192,12 @@ class EssenceScanner(threading.Thread):
         window: pygetwindow.Window = pygetwindow.getWindowsWithTitle("EndfieldTBeta2")[
             0
         ]
-        window.restore()
-        window.activate()
+        if window.isMinimized:
+            window.restore()
+            time.sleep(0.5)
+        if not window.isActive:
+            window.activate()
+            time.sleep(0.5)
 
         check_scene_result = check_scene(window)
         if not check_scene_result:
@@ -201,7 +205,9 @@ class EssenceScanner(threading.Thread):
             return
 
         for i, j in np.ndindex(len(essence_icon_y_list), len(essence_icon_x_list)):
-            window = get_active_support_window(self._supported_window_titles)
+            window: pygetwindow.Window | None = get_active_support_window(
+                self._supported_window_titles
+            )
             if window is None:
                 logger.info("终末地窗口不在前台，停止基质扫描。")
                 self._scanning.clear()
