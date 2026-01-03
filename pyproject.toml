@@ -13,7 +13,7 @@ dependencies = [
     "pydantic>=2.12.5",
     "pygetwindow>=0.0.9",
     "python-dotenv>=1.2.1",
-    "pywebview>=6.1",
+    "pywebview @ git+https://github.com/r0x0r/pywebview@dbf0e05cce8d39c4bbe9f2d718b745d8e0fc7a8d",
     "pywin32>=311",
     "uvicorn>=0.40.0",
     "websockets>=15.0.1",

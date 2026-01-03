@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 from endfield_essence_recognizer.log import logger
 
 if TYPE_CHECKING:
-    import multiprocessing
     import threading
 
     from endfield_essence_recognizer.essence_scanner import EssenceScanner
@@ -34,9 +33,8 @@ supported_window_titles = ["EndfieldTBeta2", "明日方舟：终末地"]
 # 全局变量
 essence_scanner_thread: EssenceScanner | None = None
 """基质扫描器线程实例"""
-webview_process: multiprocessing.Process | None = None
-"""WebView 进程实例"""
 server_thread: threading.Thread | None = None
+"""后端服务器线程实例"""
 
 # 构造识别器实例
 text_recognizer: Recognizer | None = None
@@ -92,35 +90,20 @@ def on_bracket_right():
 
 def on_exit():
     """处理 Alt+Delete 按下事件 - 退出程序"""
-    logger.info('检测到 "Alt+Delete"，正在退出程序...')
-
     global essence_scanner_thread
 
-    if essence_scanner_thread is not None:
-        essence_scanner_thread.stop()
-        essence_scanner_thread = None
-    if webview_process is not None and webview_process.is_alive():
-        webview_process.terminate()
-        webview_process.join()
-    if server_thread is not None and server_thread.is_alive():
-        from endfield_essence_recognizer.server import server
+    logger.info('检测到 "Alt+Delete"，正在退出程序...')
 
-        server.should_exit = True
-        server_thread.join()
+    # 关闭 webview 窗口，剩下的清理工作交给 main 函数
+    from endfield_essence_recognizer.webui import window
+
+    window.destroy()
 
 
 def main():
     """主函数"""
 
-    global text_recognizer, icon_recognizer, essence_scanner_thread, webview_process
-
-    # 尽早启动 webui（webview 必须在主线程启动，因此这里使用多进程）
-    import multiprocessing
-
-    from endfield_essence_recognizer.webui import start_pywebview
-
-    webview_process = multiprocessing.Process(target=start_pywebview)
-    webview_process.start()
+    global text_recognizer, icon_recognizer, essence_scanner_thread
 
     # 打印欢迎信息
     message = """
@@ -189,32 +172,26 @@ def main():
     )
     server_thread.start()
 
-    # 主线程等待 webview 关闭，或者捕获中断信号退出
-    import time
+    # 启动 webview
+    from endfield_essence_recognizer.webui import start_pywebview
 
     try:
-        while webview_process.is_alive():
-            time.sleep(0.01)
-        logger.info("WebView 窗口已关闭，正在退出程序...")
-        webview_process.join()
-    except (KeyboardInterrupt, SystemExit):
-        logger.info("程序被中断，正在退出...")
-        # 关闭 webview
-        webview_process.terminate()
-        webview_process.join()
-        # 继续上抛异常
-        raise
+        start_pywebview()
+        logger.info("Webview 窗口已关闭，正在退出程序...")
+
     finally:
         # 停止基质扫描线程
-        if essence_scanner_thread is not None:
+        if essence_scanner_thread is not None and essence_scanner_thread.is_alive():
             essence_scanner_thread.stop()
             essence_scanner_thread = None
+
         # 关闭后端
         server.should_exit = True
         server_thread.join()
+
         # 解除热键绑定
         keyboard.unhook_all()
-        logger.info("程序已退出")
+        logger.info("程序已退出。")
 
 
 if __name__ == "__main__":
