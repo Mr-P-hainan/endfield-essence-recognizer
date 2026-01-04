@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import importlib.resources
-from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from endfield_essence_recognizer.log import logger
+from endfield_essence_recognizer.version import __version__ as __version__
 
 if TYPE_CHECKING:
     import threading
@@ -55,37 +55,47 @@ def on_bracket_left():
         recognize_once(window, text_recognizer, icon_recognizer)  # type: ignore
 
 
-def on_bracket_right():
-    """处理 "]" 键按下事件 - 切换自动点击"""
+def toggle_scan():
+    """切换基质扫描状态"""
     import winsound
 
     from endfield_essence_recognizer.essence_scanner import EssenceScanner
+
+    global essence_scanner_thread
+
+    if essence_scanner_thread is None or not essence_scanner_thread.is_alive():
+        logger.info("开始扫描基质")
+        essence_scanner_thread = EssenceScanner(
+            text_recognizer=cast("Recognizer", text_recognizer),
+            icon_recognizer=cast("Recognizer", icon_recognizer),
+            supported_window_titles=supported_window_titles,
+        )
+        essence_scanner_thread.start()
+        winsound.PlaySound(
+            enable_sound_path.read_bytes(),
+            winsound.SND_MEMORY | winsound.SND_ASYNC,
+        )
+    else:
+        logger.info("停止扫描基质")
+        essence_scanner_thread.stop()
+        essence_scanner_thread = None
+        winsound.PlaySound(
+            disable_sound_path.read_bytes(),
+            winsound.SND_MEMORY | winsound.SND_ASYNC,
+        )
+
+
+def on_bracket_right():
+    """处理 "]" 键按下事件 - 切换自动点击"""
     from endfield_essence_recognizer.window import get_active_support_window
 
     global essence_scanner_thread
 
-    if False and get_active_support_window(supported_window_titles) is None:
+    if get_active_support_window(supported_window_titles) is None:
         logger.debug('终末地窗口不在前台，忽略 "]" 键。')
         return
     else:
-        if essence_scanner_thread is None or not essence_scanner_thread.is_alive():
-            logger.info('检测到 "]" 键，开始扫描基质')
-            essence_scanner_thread = EssenceScanner(
-                text_recognizer=text_recognizer,  # ty:ignore[invalid-argument-type]
-                icon_recognizer=icon_recognizer,  # ty:ignore[invalid-argument-type]
-                supported_window_titles=supported_window_titles,
-            )
-            essence_scanner_thread.start()
-            winsound.PlaySound(
-                str(enable_sound_path), winsound.SND_FILENAME | winsound.SND_ASYNC
-            )
-        else:
-            logger.info('检测到 "]" 键，停止扫描基质')
-            essence_scanner_thread.stop()
-            essence_scanner_thread = None
-            winsound.PlaySound(
-                str(disable_sound_path), winsound.SND_FILENAME | winsound.SND_ASYNC
-            )
+        toggle_scan()
 
 
 def on_exit():
@@ -134,7 +144,7 @@ def main():
     config.load_and_update()
 
     # 构造识别器实例
-    from endfield_essence_recognizer.data import (
+    from endfield_essence_recognizer.game_data.weapon import (
         all_attribute_stats,
         all_secondary_stats,
         all_skill_stats,
@@ -143,13 +153,13 @@ def main():
 
     text_recognizer = Recognizer(
         labels=all_attribute_stats + all_secondary_stats + all_skill_stats,
-        templates_dir=Path(str(generated_template_dir)),
+        templates_dir=generated_template_dir,
         # preprocess_roi=preprocess_text_roi,
         # preprocess_template=preprocess_text_template,
     )
     icon_recognizer = Recognizer(
         labels=["已弃用", "未弃用", "已锁定", "未锁定"],
-        templates_dir=Path(str(screenshot_template_dir)),
+        templates_dir=screenshot_template_dir,
     )
 
     # 注册热键

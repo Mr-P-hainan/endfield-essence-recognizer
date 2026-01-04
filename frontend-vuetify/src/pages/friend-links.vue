@@ -104,9 +104,7 @@ onMounted(() => {
 
     <!-- 错误状态 -->
     <div v-else-if="error" class="d-flex flex-column justify-center align-center gr-4 my-8">
-      <v-alert type="error">
-        {{ error }}
-      </v-alert>
+      <v-alert type="error">{{ error }}</v-alert>
       <v-btn color="primary" @click="fetchLinks">重试</v-btn>
     </div>
 

@@ -1,32 +1,24 @@
 import shutil
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import cast
 
-if TYPE_CHECKING:
-    from typing import cast
+from PyInstaller.building.api import COLLECT, EXE, PYZ
+from PyInstaller.building.build_main import Analysis
+from PyInstaller.config import CONF
+from PyInstaller.utils.hooks import collect_data_files
 
-    from PyInstaller.building.api import COLLECT, EXE, PYZ  # noqa: TC004
-    from PyInstaller.building.build_main import Analysis  # noqa: TC004
-    from PyInstaller.config import CONF
+DISTPATH = cast("str", CONF["distpath"])
 
-    DISTPATH = cast("str", CONF["distpath"])
 
 a = Analysis(
     ["src/endfield_essence_recognizer/__main__.py"],
     pathex=[],
     binaries=[],
     datas=[
+        *collect_data_files("endfield_essence_recognizer"),
         (
-            "src/endfield_essence_recognizer/data",
-            "endfield_essence_recognizer/data",
-        ),
-        (
-            "src/endfield_essence_recognizer/templates",
-            "endfield_essence_recognizer/templates",
-        ),
-        (
-            "src/endfield_essence_recognizer/sounds",
-            "endfield_essence_recognizer/sounds",
+            "frontend-vuetify/dist",
+            "endfield_essence_recognizer/webui_dist",
         ),
     ],
     hiddenimports=[],
@@ -49,7 +41,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True,
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
@@ -73,11 +65,7 @@ readme_dst = Path(DISTPATH) / "endfield-essence-recognizer" / "README.md"
 shutil.copy(readme_src, readme_dst)
 
 # 删除不需要的 opencv_videoio_ffmpeg DLL
-ffmpeg_dll = (
-    Path(DISTPATH)
-    / "endfield-essence-recognizer"
-    / "_internal"
-    / "cv2"
-    / "opencv_videoio_ffmpeg4120_64.dll"
-)
-ffmpeg_dll.unlink()
+for path in (Path(DISTPATH) / "endfield-essence-recognizer" / "_internal" / "cv2").glob(
+    "opencv_videoio_ffmpeg*.dll"
+):
+    path.unlink()

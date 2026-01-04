@@ -2,7 +2,6 @@ import importlib.resources
 import threading
 import time
 from collections.abc import Container
-from pathlib import Path
 from typing import Literal
 
 import cv2
@@ -10,7 +9,12 @@ import numpy as np
 import pygetwindow
 
 from endfield_essence_recognizer.config import config
-from endfield_essence_recognizer.data import weapons
+from endfield_essence_recognizer.game_data import get_translation, weapon_basic_table
+from endfield_essence_recognizer.game_data.item import get_item_name
+from endfield_essence_recognizer.game_data.weapon import (
+    weapon_stats_dict,
+    weapon_type_int_to_translation_key,
+)
 from endfield_essence_recognizer.image import load_image
 from endfield_essence_recognizer.log import logger
 from endfield_essence_recognizer.recognizer import Recognizer
@@ -59,7 +63,7 @@ def check_scene(window: pygetwindow.Window) -> bool:
         return False
 
     screenshot = screenshot_window(window, ESSENCE_UI_ROI)
-    template = load_image(Path(str(ESSENCE_UI_TEMPLATE_PATH)))
+    template = load_image(ESSENCE_UI_TEMPLATE_PATH.read_bytes())
     res = cv2.matchTemplate(screenshot, template, cv2.TM_CCOEFF_NORMED)
     _, max_val, _, _ = cv2.minMaxLoc(res)
     logger.debug(f"基质界面模板匹配分数: {max_val:.3f}")
@@ -87,21 +91,22 @@ def judge_essence_quality(stats: list[str | None]) -> Literal["treasure", "trash
             return "treasure"
 
     # 尝试匹配已实装武器
-    for weapon_id, weapon_data in weapons.items():
+    for weapon_id, weapon_basic in weapon_basic_table.items():
+        weapon_stats = weapon_stats_dict[weapon_id]
         if (
-            weapon_data["stats"]["attribute"] == stats[0]
-            and weapon_data["stats"]["secondary"] == stats[1]
-            and weapon_data["stats"]["skill"] == stats[2]
+            weapon_stats["attribute"] == stats[0]
+            and weapon_stats["secondary"] == stats[1]
+            and weapon_stats["skill"] == stats[2]
         ):
             # 匹配到已实装武器
             if weapon_id in config.trash_weapon_ids:
                 logger.opt(colors=True).warning(
-                    f"这个基质虽然匹配武器<bold>{weapon_data['weaponName']}（{weapon_data['rarity']}★ {weapon_data['weaponType']}）</>，但是它被认为是<red><bold><underline>垃圾</></></>。"
+                    f"这个基质虽然匹配武器<bold>{get_item_name(weapon_id, 'CN')}（{weapon_basic_table[weapon_id]['rarity']}★ {get_translation(weapon_type_int_to_translation_key[weapon_id], 'CN')}）</>，但是它被认为是<red><bold><underline>垃圾</></></>。"
                 )
                 return "trash"
             else:
                 logger.opt(colors=True).success(
-                    f"这个基质是<green><bold><underline>宝藏</></></>，它完美契合武器<bold>{weapon_data['weaponName']}（{weapon_data['rarity']}★ {weapon_data['weaponType']}）</>。"
+                    f"这个基质是<green><bold><underline>宝藏</></></>，它完美契合武器<bold>{get_item_name(weapon_id, 'CN')}（{weapon_basic_table[weapon_id]['rarity']}★ {get_translation(weapon_type_int_to_translation_key[weapon_id], 'CN')}）</>。"
                 )
                 return "treasure"
     else:
@@ -189,9 +194,15 @@ class EssenceScanner(threading.Thread):
         #     return
         import pygetwindow
 
-        window: pygetwindow.Window = pygetwindow.getWindowsWithTitle("EndfieldTBeta2")[
-            0
-        ]
+        windows: list[pygetwindow.Window] = pygetwindow.getWindowsWithTitle(
+            "EndfieldTBeta2"
+        )
+        if not windows:
+            logger.info("未找到终末地窗口，停止基质扫描。")
+            self._scanning.clear()
+            return
+
+        window: pygetwindow.Window | None = windows[0]
         if window.isMinimized:
             window.restore()
             time.sleep(0.5)
@@ -205,9 +216,7 @@ class EssenceScanner(threading.Thread):
             return
 
         for i, j in np.ndindex(len(essence_icon_y_list), len(essence_icon_x_list)):
-            window: pygetwindow.Window | None = get_active_support_window(
-                self._supported_window_titles
-            )
+            window = get_active_support_window(self._supported_window_titles)
             if window is None:
                 logger.info("终末地窗口不在前台，停止基质扫描。")
                 self._scanning.clear()

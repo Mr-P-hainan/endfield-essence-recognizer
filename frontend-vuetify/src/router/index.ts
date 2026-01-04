@@ -35,6 +35,13 @@
 // export default router
 
 import { createRouter, createWebHistory } from 'vue-router'
+import Index from '@/pages/index.vue'
+import Docs from '@/pages/docs.vue'
+import Settings from '@/pages/settings.vue'
+import Monitor from '@/pages/monitor.vue'
+import FriendLinks from '@/pages/friend-links.vue'
+import Yituliu from '@/pages/yituliu.vue'
+import Logs from '@/pages/logs.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -42,44 +49,44 @@ const router = createRouter({
     {
       path: '/',
       name: 'home',
-      component: () => import('@/pages/index.vue'),
+      component: Index,
       meta: { title: '首页', icon: 'mdi-home' },
+    },
+    {
+      path: '/logs',
+      name: 'logs',
+      component: Logs,
+      meta: { title: '日志', icon: 'mdi-file-document-outline' },
     },
     {
       path: '/docs',
       name: 'docs',
-      component: () => import('@/pages/docs.vue'),
+      component: Docs,
       meta: { title: '文档', icon: 'mdi-file-document' },
     },
     {
       path: '/settings',
       name: 'settings',
-      component: () => import('@/pages/settings.vue'),
+      component: Settings,
       meta: { title: '设置', icon: 'mdi-cog' },
     },
     {
       path: '/monitor',
       name: 'monitor',
-      component: () => import('@/pages/monitor.vue'),
+      component: Monitor,
       meta: { title: '监控', icon: 'mdi-monitor' },
     },
     {
       path: '/friend-links',
       name: 'friend-links',
-      component: () => import('@/pages/friend-links.vue'),
+      component: FriendLinks,
       meta: { title: '友情链接', icon: 'mdi-link' },
     },
     {
       path: '/yituliu',
       name: 'yituliu',
-      component: () => import('@/pages/yituliu.vue'),
+      component: Yituliu,
       meta: { title: '终末地一图流', icon: 'mdi-map' },
-    },
-    {
-      path: '/logs',
-      name: 'logs',
-      component: () => import('@/pages/logs.vue'),
-      meta: { title: '日志', icon: 'mdi-file-document-outline' },
     },
   ],
 })

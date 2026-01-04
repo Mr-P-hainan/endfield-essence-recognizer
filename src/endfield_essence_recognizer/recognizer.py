@@ -1,7 +1,8 @@
+import importlib.resources
 import itertools
 from collections import defaultdict
 from collections.abc import Callable
-from pathlib import Path
+from importlib.abc import Traversable
 
 import cv2
 from cv2.typing import MatLike
@@ -34,14 +35,14 @@ class Recognizer:
     def __init__(
         self,
         labels: list[str],
-        templates_dir: Path,
+        templates_dir: Traversable,
         high_thresh: float = HIGH_THRESH,
         low_thresh: float = LOW_THRESH,
         preprocess_roi: Callable[[MatLike], MatLike] | None = None,
         preprocess_template: Callable[[MatLike], MatLike] | None = None,
     ) -> None:
         self.labels: list[str] = labels
-        self.templates_dir: Path = templates_dir
+        self.templates_dir: Traversable = templates_dir
         self.high_thresh: float = high_thresh
         self.low_thresh: float = low_thresh
         self.preprocess_roi: Callable[[MatLike], MatLike] = (
@@ -64,22 +65,23 @@ class Recognizer:
 
     def load_templates(self) -> None:
         logger.info(f"正在从目录加载模板: {self.templates_dir}...")
-        if not self.templates_dir.exists():
+        if not self.templates_dir.is_dir():
             logger.error(f"模板目录未找到: {self.templates_dir}")
             return
 
         for label in self.labels:
-            for path in itertools.chain(
-                self.templates_dir.glob(label + "*"),
-                (self.templates_dir / label).glob("**/*"),
-            ):
-                if path.suffix.lower() in self._suffixes and path.is_file():
-                    try:
-                        image = load_image(path, cv2.IMREAD_GRAYSCALE)
-                        image = self.preprocess_template(image)
-                        self._templates[label].append(image)
-                    except Exception as e:
-                        logger.error(f"加载模板图像失败 {path}: {e}")
+            with importlib.resources.as_file(self.templates_dir) as templates_dir_path:
+                for path in itertools.chain(
+                    templates_dir_path.glob(label + "*"),
+                    (templates_dir_path / label).glob("**/*"),
+                ):
+                    if path.suffix.lower() in self._suffixes and path.is_file():
+                        try:
+                            image = load_image(path, cv2.IMREAD_GRAYSCALE)
+                            image = self.preprocess_template(image)
+                            self._templates[label].append(image)
+                        except Exception as e:
+                            logger.error(f"加载模板图像失败 {path}: {e}")
             if not self._templates[label]:
                 logger.error(f'在 {self.templates_dir} 中未找到标签 "{label}" 的模板')
 

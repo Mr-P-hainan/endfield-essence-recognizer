@@ -38,13 +38,12 @@ class Config(BaseModel):
     trash_action: Action = "unlock"
 
     def update_from_model(self, other: Config) -> None:
-        for key, value in other.model_dump().items():
-            setattr(self, key, value)
+        for field in self.__class__.model_fields:
+            setattr(self, field, getattr(other, field))
 
     def update_from_dict(self, data: dict[str, Any]) -> None:
-        for key, value in data.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
+        model = Config.model_validate(data)
+        self.update_from_model(model)
 
     @classmethod
     def load(cls) -> Self:

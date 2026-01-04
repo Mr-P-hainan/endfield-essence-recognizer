@@ -29,7 +29,7 @@ gui_log_format = file_log_format
 
 
 # https://loguru.readthedocs.io/en/stable/overview.html#entirely-compatible-with-standard-logging
-class LoguruHandler(logging.Handler):  # pragma: no cover
+class LoguruHandler(logging.Handler):
     """logging 与 loguru 之间的桥梁，将 logging 的日志转发到 loguru。"""
 
     def emit(self, record: logging.LogRecord):
@@ -54,8 +54,8 @@ LOGGING_CONFIG = {
     "disable_existing_loggers": False,
     "handlers": {"default": {"class": "endfield_essence_recognizer.log.LoguruHandler"}},
     "loggers": {
-        "uvicorn.error": {"handlers": ["default"], "level": "INFO"},
-        "uvicorn.access": {"handlers": ["default"], "level": "INFO"},
+        "uvicorn.error": {"handlers": ["default"], "level": "WARNING"},
+        "uvicorn.access": {"handlers": ["default"], "level": "WARNING"},
     },
 }
 
@@ -74,12 +74,13 @@ websocket_handler = WebSocketHandler()
 
 
 logger.remove()
-logger.add(
-    sys.stderr,
-    level="INFO",
-    format=console_log_format,
-    diagnose=True,
-)
+if sys.stderr:  # 打包后可能没有 stderr
+    logger.add(
+        sys.stderr,
+        level="INFO",
+        format=console_log_format,
+        diagnose=True,
+    )
 logger.add(
     "logs/log_{time:YYYY-MM-DD}.log",
     level="TRACE",

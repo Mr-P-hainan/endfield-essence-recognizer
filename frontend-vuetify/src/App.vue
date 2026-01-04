@@ -33,10 +33,11 @@
 </template>
 
 <script lang="ts" setup>
-import { ref } from 'vue'
+import { useLogs } from '@/composables/useLogs'
+import { initGameData } from '@/utils/gameData/gameData'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTheme } from 'vuetify'
-import { useLogs } from '@/composables/useLogs'
 
 const route = useRoute()
 const router = useRouter()
@@ -46,6 +47,11 @@ const drawer = ref<boolean | null>(null)
 
 // 初始化日志 WebSocket 连接
 useLogs()
+
+// 初始化游戏数据
+onMounted(async () => {
+  await initGameData()
+})
 </script>
 
 <style scoped lang="scss"></style>

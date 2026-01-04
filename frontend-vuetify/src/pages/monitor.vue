@@ -71,7 +71,16 @@
         </template>
       </v-slider>
     </div>
-    <img alt="Screenshot" class="my-4" :src="screenshotUrl" style="max-width: 100%; height: auto" />
+    <img
+      v-if="screenshotUrl !== null"
+      alt="Screenshot"
+      class="my-4"
+      :src="screenshotUrl"
+      style="max-width: 100%; height: auto"
+    />
+    <v-alert v-else class="my-4" border="start" type="warning" variant="tonal">
+      终末地窗口不在前台
+    </v-alert>
   </v-container>
 </template>
 
@@ -83,7 +92,7 @@ const width = ref<number>(1920)
 const height = ref<number>(1080)
 const format = ref<string>('jpg')
 const quality = ref<number>(75)
-const screenshotUrl = ref<string>('')
+const screenshotUrl = ref<string | null>(null)
 
 let timer: number | null = null
 

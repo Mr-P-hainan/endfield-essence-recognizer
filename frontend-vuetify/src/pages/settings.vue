@@ -5,58 +5,59 @@
         <v-expansion-panel-title>武器基质预设</v-expansion-panel-title>
         <v-expansion-panel-text>
           <h2>将以下武器所对应的基质视为宝藏</h2>
-          <template v-for="weaponType in weaponTypes" :key="weaponType">
+          <template
+            v-for="{ groupId, groupName, iconId } in wikiGroupTable['wiki_type_weapon']?.list ?? []"
+            :key="groupId"
+          >
             <h3>
               <v-checkbox
                 density="compact"
                 hide-details
-                :indeterminate="isPartiallySelected(weaponType)"
-                :model-value="isAllSelected(weaponType)"
-                @click="selectAllForType(weaponType, !isAllSelected(weaponType))"
+                :indeterminate="isPartiallySelected(groupId)"
+                :model-value="isAllSelected(groupId)"
+                @click="selectAllForGroup(groupId, !isAllSelected(groupId))"
               >
                 <template #prepend>
-                  <h3 style="margin: 0">{{ weaponType }}</h3>
+                  <img
+                    :src="getGroupIconUrl(iconId)"
+                    :alt="getTranslation(groupName)"
+                    class="group-icon me-2"
+                    :style="{
+                      filter: theme.current.value.dark ? 'none' : 'invert(1)',
+                    }"
+                  />
+                  <h3 class="ma-0">{{ getTranslation(groupName) }}</h3>
                 </template>
               </v-checkbox>
             </h3>
-            <div class="d-flex flex-row flex-wrap gc-4">
-              <v-checkbox
-                v-for="[weaponId, weapon] in Object.entries(weapons).filter(
-                  ([weaponId, weapon]) => weapon.weaponType === weaponType
+            <div class="weapon-grid">
+              <div
+                v-for="[wikiEntryId, weaponId] in wikiEntryTable[groupId]!.list.map(
+                  (wikiEntryId) => [wikiEntryId, wikiEntryDataTable[wikiEntryId]!.refItemId],
                 )"
-                :key="weaponId"
-                v-model="selectedWeaponIds"
-                color="primary"
-                density="comfortable"
-                hide-details
-                :label="weapon.weaponName"
-                :value="weaponId"
-              />
-              <!-- <v-btn
-                v-for="[weaponId, weapon] in Object.entries(weapons).filter(
-                  ([weaponId, weapon]) => weapon.weaponType === weaponType
-                )"
-                variant="outlined"
-                :color="selectedWeaponIds.includes(weaponId) ? 'success' : 'error'"
-                @click="
-                  () => {
-                    const index = selectedWeaponIds.indexOf(weaponId)
-                    if (index === -1) {
-                      selectedWeaponIds.push(weaponId)
-                    } else {
-                      selectedWeaponIds.splice(index, 1)
-                    }
-                  }
-                "
+                :key="wikiEntryId"
+                class="d-flex flex-column align-center"
+                :class="{
+                  'opacity-50': !selectedWeaponIds.includes(weaponId!),
+                }"
               >
-                <template v-slot:prepend>
-                  <v-icon
-                    :color="selectedWeaponIds.includes(weaponId) ? 'success' : 'error'"
-                    :icon="selectedWeaponIds.includes(weaponId) ? 'mdi-check' : 'mdi-close'"
-                  ></v-icon>
-                </template>
-                {{ weapon.weaponName }}
-              </v-btn> -->
+                <div
+                  class="weapon-item"
+                  @click="
+                    selectedWeaponIds.includes(weaponId!)
+                      ? selectedWeaponIds.splice(selectedWeaponIds.indexOf(weaponId!), 1)
+                      : selectedWeaponIds.push(weaponId!)
+                  "
+                >
+                  <item-icon :item-id="weaponId!" show-item-name />
+                </div>
+                <v-checkbox-btn
+                  v-model="selectedWeaponIds"
+                  color="primary"
+                  density="comfortable"
+                  :value="weaponId"
+                />
+              </div>
             </div>
           </template>
         </v-expansion-panel-text>
@@ -70,8 +71,14 @@
           </v-alert>
           <v-row v-for="(essenceStat, index) in treasureEssenceStats" :key="index" align="center">
             <v-col cols="12" sm="6" md="3">
-              <v-text-field
+              <v-select
                 v-model="essenceStat.attribute"
+                :items="
+                  allAttributeStats.map((gemTermId) => ({
+                    title: getGemTagName(gemTermId),
+                    value: gemTermId,
+                  }))
+                "
                 density="comfortable"
                 hide-details
                 label="基础属性"
@@ -79,8 +86,14 @@
               />
             </v-col>
             <v-col cols="12" sm="6" md="3">
-              <v-text-field
+              <v-select
                 v-model="essenceStat.secondary"
+                :items="
+                  allSecondaryStats.map((gemTermId) => ({
+                    title: getGemTagName(gemTermId),
+                    value: gemTermId,
+                  }))
+                "
                 density="comfortable"
                 hide-details
                 label="附加属性"
@@ -88,8 +101,14 @@
               />
             </v-col>
             <v-col cols="12" sm="6" md="3">
-              <v-text-field
+              <v-select
                 v-model="essenceStat.skill"
+                :items="
+                  allSkillStats.map((gemTermId) => ({
+                    title: getGemTagName(gemTermId),
+                    value: gemTermId,
+                  }))
+                "
                 density="comfortable"
                 hide-details
                 label="技能属性"
@@ -198,11 +217,46 @@
 </template>
 
 <script lang="ts" setup>
+import ItemIcon from '@/components/ItemIcon.vue'
+import {
+  gemTable,
+  getTranslation,
+  weaponBasicTable,
+  wikiEntryDataTable,
+  wikiEntryTable,
+  wikiGroupTable,
+} from '@/utils/gameData/gameData'
 import { computed, onMounted, ref, watch } from 'vue'
+import { useTheme } from 'vuetify'
 
-interface Weapon {
-  weaponType: string
-  weaponName: string
+const theme = useTheme()
+
+const allAttributeStats = computed(() =>
+  Object.values(gemTable.value)
+    .filter((gem) => gem.termType === 0)
+    .map((gem) => gem.gemTermId),
+)
+const allSecondaryStats = computed(() =>
+  Object.values(gemTable.value)
+    .filter((gem) => gem.termType === 1)
+    .map((gem) => gem.gemTermId),
+)
+const allSkillStats = computed(() =>
+  Object.values(gemTable.value)
+    .filter((gem) => gem.termType === 2)
+    .map((gem) => gem.gemTermId),
+)
+
+function getGemTagName(gemTermId: string): string {
+  const gem = gemTable.value[gemTermId]
+  if (gem === undefined) {
+    return gemTermId
+  }
+  return getTranslation(gem.tagName) || gemTermId
+}
+
+function getGroupIconUrl(iconId: string): string {
+  return `https://cos.yituliu.cn/endfield/sprites_selective/wiki/groupicon/${iconId}.png`
 }
 
 interface EssenceStat {
@@ -216,19 +270,17 @@ const treasureEssenceStats = ref<EssenceStat[]>([])
 const treasureAction = ref('lock')
 const trashAction = ref('unlock')
 
-const weaponTypes = ['单手剑', '双手剑', '长柄武器', '手铳', '施术单元']
-const weapons = ref<Record<string, Weapon>>({})
-
 const notSelectedWeaponIds = computed(() => {
-  return Object.keys(weapons.value).filter(
-    (weaponId) => !selectedWeaponIds.value.includes(weaponId)
+  return Object.keys(weaponBasicTable.value).filter(
+    (weaponId) => !selectedWeaponIds.value.includes(weaponId),
   )
 })
 
-function selectAllForType(weaponType: string, select: boolean) {
-  const weaponIds = Object.entries(weapons.value)
-    .filter(([_, weapon]: [string, Weapon]) => weapon.weaponType === weaponType)
-    .map(([id, _]) => id)
+function selectAllForGroup(groupId: string, select: boolean) {
+  const weaponIds =
+    wikiEntryTable.value[groupId]?.list.map(
+      (wikiEntryId) => wikiEntryDataTable.value[wikiEntryId]!.refItemId,
+    ) ?? []
   if (select) {
     selectedWeaponIds.value = [...new Set([...selectedWeaponIds.value, ...weaponIds])]
   } else {
@@ -236,17 +288,19 @@ function selectAllForType(weaponType: string, select: boolean) {
   }
 }
 
-function isAllSelected(weaponType: string): boolean {
-  const weaponIds = Object.entries(weapons.value)
-    .filter(([_, weapon]) => weapon.weaponType === weaponType)
-    .map(([id, _]) => id)
+function isAllSelected(groupId: string): boolean {
+  const weaponIds =
+    wikiEntryTable.value[groupId]?.list.map(
+      (wikiEntryId) => wikiEntryDataTable.value[wikiEntryId]!.refItemId,
+    ) ?? []
   return weaponIds.every((id) => selectedWeaponIds.value.includes(id))
 }
 
-function isPartiallySelected(weaponType: string): boolean {
-  const weaponIds = Object.entries(weapons.value)
-    .filter(([_, weapon]) => weapon.weaponType === weaponType)
-    .map(([id, _]) => id)
+function isPartiallySelected(groupId: string): boolean {
+  const weaponIds =
+    wikiEntryTable.value[groupId]?.list.map(
+      (wikiEntryId) => wikiEntryDataTable.value[wikiEntryId]!.refItemId,
+    ) ?? []
   const selectedCount = weaponIds.filter((id) => selectedWeaponIds.value.includes(id)).length
   return selectedCount > 0 && selectedCount < weaponIds.length
 }
@@ -261,12 +315,6 @@ const config = computed(() => {
   }
 })
 
-async function getWeapons() {
-  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/weapons`)
-  const result = await response.json()
-  weapons.value = result
-}
-
 async function getConfig() {
   const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/config`)
   const result = await response.json()
@@ -274,8 +322,8 @@ async function getConfig() {
   treasureEssenceStats.value = treasure_essence_stats
   treasureAction.value = treasure_action
   trashAction.value = trash_action
-  selectedWeaponIds.value = Object.keys(weapons.value).filter(
-    (weaponId) => !trash_weapon_ids.includes(weaponId)
+  selectedWeaponIds.value = Object.keys(weaponBasicTable.value).filter(
+    (weaponId) => !trash_weapon_ids.includes(weaponId),
   )
 }
 
@@ -290,10 +338,32 @@ async function postConfig() {
 }
 
 onMounted(async () => {
-  await getWeapons()
   await getConfig()
-  watch(config, postConfig)
+  watch(config, postConfig, { deep: true })
 })
 </script>
 
-<style scoped lang="scss"></style>
+<style scoped lang="scss">
+$weapon-icon-size: clamp(3rem, 16vw, 6rem);
+
+.group-icon {
+  width: 2rem;
+  height: 2rem;
+}
+
+.customize-button {
+  height: $weapon-icon-size !important;
+  width: $weapon-icon-size !important;
+}
+
+.weapon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, $weapon-icon-size);
+  gap: calc($weapon-icon-size / 10);
+}
+
+.weapon-item {
+  width: $weapon-icon-size;
+  height: $weapon-icon-size;
+}
+</style>

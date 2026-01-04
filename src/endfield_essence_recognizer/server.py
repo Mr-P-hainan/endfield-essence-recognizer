@@ -1,4 +1,5 @@
 import asyncio
+import importlib.resources
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -6,24 +7,28 @@ from typing import Any, Literal
 
 import uvicorn
 from dotenv import load_dotenv
-from fastapi import APIRouter, Body, FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import Body, FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from endfield_essence_recognizer import on_bracket_right, supported_window_titles
-from endfield_essence_recognizer.data import Weapons, weapons
+from endfield_essence_recognizer import supported_window_titles, toggle_scan
 from endfield_essence_recognizer.log import LOGGING_CONFIG, logger, websocket_handler
 
 # 加载 .env 文件
 load_dotenv()
 
 # 从环境变量读取配置
-is_dev = os.getenv("DEV_MODE", "false").lower() in ("true", "1", "yes")
-api_host = os.getenv("API_HOST", "127.0.0.1")
-api_port = int(os.getenv("API_PORT", "8000"))
-dev_url = os.getenv("DEV_URL", "http://localhost:3000")
+is_dev = os.getenv("EER_DEV_MODE", "false").lower() in ("true", "1", "yes")
+dist_dir_str = os.getenv("EER_DIST_DIR", "")
+api_host = os.getenv("EER_API_HOST", "127.0.0.1")
+api_port = int(os.getenv("EER_API_PORT", "8000"))
+dev_url = os.getenv("EER_DEV_URL", "http://localhost:3000")
 prod_url = f"http://{api_host}:{api_port}"
 webview_url = dev_url if is_dev else prod_url
+
+logger.success(
+    f"Loaded env: {is_dev=}, {dist_dir_str=}, {api_host=}, {api_port=}, {webview_url=}"
+)
 
 
 async def broadcast_logs():
@@ -57,25 +62,28 @@ async def lifespan(app: FastAPI):
             pass
 
 
-router = APIRouter(lifespan=lifespan)
 websocket_connections: set[WebSocket] = set()
 task: asyncio.Task | None = None
 connection_event = asyncio.Event()
 
+app = FastAPI(lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,  # ty:ignore[invalid-argument-type]
+    allow_origins=["*"],  # 生产环境可指定具体域名
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-@router.get("/api/weapons")
-async def get_weapons() -> Weapons:
-    return weapons
 
-
-@router.get("/api/config")
+@app.get("/api/config")
 async def get_config() -> dict[str, Any]:
     from endfield_essence_recognizer.config import config
 
     return config.model_dump()
 
 
-@router.post("/api/config")
+@app.post("/api/config")
 async def post_config(new_config: dict[str, Any] = Body()) -> dict[str, Any]:
     from endfield_essence_recognizer.config import config
 
@@ -84,17 +92,16 @@ async def post_config(new_config: dict[str, Any] = Body()) -> dict[str, Any]:
     return config.model_dump()
 
 
-@router.get("/api/screenshot")
+@app.get("/api/screenshot")
 async def get_screenshot(
     width: int = 1920,
     height: int = 1080,
     format: Literal["jpg", "jpeg", "png", "webp"] = "jpg",  # noqa: A002
     quality: int = 75,
-):
+) -> str | None:
     import base64
 
     import cv2
-    import numpy as np
 
     from endfield_essence_recognizer.window import (
         get_active_support_window,
@@ -103,7 +110,7 @@ async def get_screenshot(
 
     window = get_active_support_window(supported_window_titles)
     if window is None:
-        image = np.zeros((height, width, 3), dtype=np.uint8)
+        return None
     else:
         image = screenshot_window(window)
         image = cv2.resize(image, (width, height))
@@ -124,6 +131,8 @@ async def get_screenshot(
         encode_param = [cv2.IMWRITE_JPEG_QUALITY, min(100, max(0, quality))]
         ext = ".jpg"
         mime_type = "image/jpeg"
+    else:
+        return None
 
     _, encoded_bytes = cv2.imencode(ext, image, encode_param)
 
@@ -133,12 +142,12 @@ async def get_screenshot(
     return f"data:{mime_type};base64,{base64_string}"
 
 
-@router.post("/api/start_scanning")
+@app.post("/api/start_scanning")
 async def start_scanning():
-    on_bracket_right()
+    toggle_scan()
 
 
-@router.websocket("/ws/logs")
+@app.websocket("/ws/logs")
 async def websocket_logs(websocket: WebSocket):
     await websocket.accept()
     websocket_connections.add(websocket)
@@ -154,32 +163,35 @@ async def websocket_logs(websocket: WebSocket):
         logger.exception(f"WebSocket 日志连接出错：{e}")
 
 
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,  # ty:ignore[invalid-argument-type]
-    allow_origins=["*"],  # 生产环境可指定具体域名
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+app.mount(
+    "/api/data",
+    StaticFiles(
+        directory=str(importlib.resources.files("endfield_essence_recognizer") / "data")
+    ),
+    name="data",
 )
 
-# 注册API路由
-app.include_router(router)
-
 if not is_dev:
+    if not dist_dir_str:
+        dist_dir = Path(
+            str(importlib.resources.files("endfield_essence_recognizer") / "webui_dist")
+        )
+    else:
+        dist_dir = Path(dist_dir_str)
     # 挂载静态文件目录（生产环境）
-    DIST_DIR = Path("frontend-vuetify/dist")
-    if DIST_DIR.exists():
+    if dist_dir.exists():
         app.mount(
             "/",
-            StaticFiles(directory=DIST_DIR, html=True),
+            StaticFiles(directory=dist_dir, html=True),
+            name="dist",
         )
     else:
         logger.error("未找到前端构建文件夹，请先执行前端构建！")
 
-
 config = uvicorn.Config(
-    app=app, host=api_host, port=api_port, log_config=LOGGING_CONFIG
+    app=app,
+    host=api_host,
+    port=api_port,
+    # log_config=LOGGING_CONFIG
 )
 server = uvicorn.Server(config)
