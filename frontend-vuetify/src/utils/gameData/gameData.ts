@@ -90,11 +90,11 @@ export async function initGameData() {
       .then((text) => {
         gemTable.value = parseJSONWithBigInt(text)
       }),
-    fetch(getResourceUrl(gemTagIdTablePath))
-      .then((res) => res.text())
-      .then((text) => {
-        gemTagIdTable.value = parseJSONWithBigInt(text)
-      }),
+    // fetch(getResourceUrl(gemTagIdTablePath))
+    //   .then((res) => res.text())
+    //   .then((text) => {
+    //     gemTagIdTable.value = parseJSONWithBigInt(text)
+    //   }),
     fetch(getResourceUrl(itemTablePath))
       .then((res) => res.text())
       .then((text) => {
@@ -105,16 +105,16 @@ export async function initGameData() {
       .then((text) => {
         rarityColorTable.value = parseJSONWithBigInt(text)
       }),
-    fetch(getResourceUrl(skillPatchTablePath))
-      .then((res) => res.text())
-      .then((text) => {
-        skillPatchTable.value = parseJSONWithBigInt(text)
-      }),
-    fetch(getResourceUrl(textTablePath))
-      .then((res) => res.text())
-      .then((text) => {
-        textTable.value = parseJSONWithBigInt(text)
-      }),
+    // fetch(getResourceUrl(skillPatchTablePath))
+    //   .then((res) => res.text())
+    //   .then((text) => {
+    //     skillPatchTable.value = parseJSONWithBigInt(text)
+    //   }),
+    // fetch(getResourceUrl(textTablePath))
+    //   .then((res) => res.text())
+    //   .then((text) => {
+    //     textTable.value = parseJSONWithBigInt(text)
+    //   }),
     fetch(getResourceUrl(weaponBasicTablePath))
       .then((res) => res.text())
       .then((text) => {
