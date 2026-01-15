@@ -1,6 +1,7 @@
 @use '@/styles/settings';
-$mono-font: 'Jetbrains Mono', 'Google Sans Code', 'Cascadia Mono', Consolas, settings.$sans-font,
-  monospace;
+
+$mono-font:
+  'Jetbrains Mono', 'Google Sans Code', 'Cascadia Mono', Consolas, settings.$sans-font, monospace;
 $paragraph-margin: 0.6em;
 
 h1,

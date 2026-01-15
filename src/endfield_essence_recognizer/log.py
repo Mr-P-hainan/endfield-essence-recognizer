@@ -7,6 +7,8 @@ import sys
 
 from loguru import logger
 
+from endfield_essence_recognizer.path import ROOT_DIR
+
 file_log_format = (
     '<dim>File <cyan>"{file.path}"</>, line <cyan>{line}</>, in <cyan>{function}</></>\n'
     "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</> "
@@ -44,9 +46,9 @@ class LoguruHandler(logging.Handler):
             depth += 1
 
         message = f"<magenta>{record.name.split('.')[0]}</> | {record.getMessage()}"
-        logger.opt(colors=True, depth=depth, exception=record.exc_info).log(
-            level, message
-        )
+        logger.opt(colors=True, depth=depth, exception=record.exc_info).bind(
+            module="uvicorn"
+        ).log(level, message)
 
 
 LOGGING_CONFIG = {
@@ -54,8 +56,8 @@ LOGGING_CONFIG = {
     "disable_existing_loggers": False,
     "handlers": {"default": {"class": "endfield_essence_recognizer.log.LoguruHandler"}},
     "loggers": {
-        "uvicorn.error": {"handlers": ["default"], "level": "WARNING"},
-        "uvicorn.access": {"handlers": ["default"], "level": "WARNING"},
+        "uvicorn.error": {"handlers": ["default"], "level": "INFO"},
+        "uvicorn.access": {"handlers": ["default"], "level": "INFO"},
     },
 }
 
@@ -82,7 +84,7 @@ if sys.stderr:  # 打包后可能没有 stderr
         diagnose=True,
     )
 logger.add(
-    "logs/log_{time:YYYY-MM-DD}.log",
+    ROOT_DIR / "logs" / "log_{time:YYYY-MM-DD}.log",
     level="TRACE",
     format=file_log_format,
     diagnose=True,
@@ -91,6 +93,7 @@ logger.add(
     websocket_handler,
     level="INFO",
     format=console_log_format,
-    diagnose=True,
     colorize=True,
+    diagnose=True,
+    filter=lambda record: record["extra"].get("module") != "uvicorn",
 )

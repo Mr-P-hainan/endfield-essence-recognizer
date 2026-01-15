@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any, ClassVar, Literal, Self
 
 from pydantic import BaseModel
 
 from endfield_essence_recognizer.log import logger
+from endfield_essence_recognizer.path import ROOT_DIR
 
 type Action = Literal[
     "keep",
@@ -17,7 +17,7 @@ type Action = Literal[
     "unlock_and_undeprecate",
 ]
 
-config_path = Path("config.json")
+config_path = ROOT_DIR / "config.json"
 
 
 class EssenceStats(BaseModel):
@@ -51,17 +51,17 @@ class Config(BaseModel):
             logger.info(f"正在加载配置文件：{config_path.resolve()}")
             obj = json.loads(config_path.read_text(encoding="utf-8"))
             if "version" in obj and obj["version"] == cls._VERSION:
-                return cls.model_validate(obj)
+                config = cls.model_validate(obj)
+                logger.info(f"已加载配置文件：{config!r}")
             else:
                 logger.warning("配置文件版本不匹配，已忽略旧配置。")
                 config = cls()
                 config.save()
-                return config
         else:
             logger.info("未找到配置文件，使用默认配置。")
             config = cls()
             config.save()
-            return config
+        return config
 
     def load_and_update(self) -> None:
         loaded_config = self.load()

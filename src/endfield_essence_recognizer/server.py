@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from endfield_essence_recognizer import supported_window_titles, toggle_scan
 from endfield_essence_recognizer.log import LOGGING_CONFIG, logger, websocket_handler
+from endfield_essence_recognizer.path import ROOT_DIR
 
 # 加载 .env 文件
 load_dotenv()
@@ -147,6 +148,27 @@ async def start_scanning():
     toggle_scan()
 
 
+@app.post("/api/open_logs_folder")
+async def open_logs_folder():
+    import platform
+
+    from endfield_essence_recognizer.log import logger
+
+    LOGS_DIR = ROOT_DIR / "logs"
+
+    try:
+        if platform.system() == "Windows":  # Windows
+            os.startfile(LOGS_DIR)
+        elif platform.system() == "Darwin":  # macOS
+            await asyncio.create_subprocess_exec("open", str(LOGS_DIR))
+        else:  # Linux and others
+            await asyncio.create_subprocess_exec("xdg-open", str(LOGS_DIR))
+        logger.info(f"已打开日志目录：{LOGS_DIR}")
+    except Exception as e:
+        logger.exception(f"打开日志目录时出错：{e}")
+        raise
+
+
 @app.websocket("/ws/logs")
 async def websocket_logs(websocket: WebSocket):
     await websocket.accept()
@@ -189,9 +211,6 @@ if not is_dev:
         logger.error("未找到前端构建文件夹，请先执行前端构建！")
 
 config = uvicorn.Config(
-    app=app,
-    host=api_host,
-    port=api_port,
-    # log_config=LOGGING_CONFIG
+    app=app, host=api_host, port=api_port, log_config=LOGGING_CONFIG
 )
 server = uvicorn.Server(config)

@@ -42,7 +42,8 @@
           请在终末地的设置中将分辨率调整为 <strong class="text-primary">1920×1080 窗口</strong>
         </li>
         <li>
-          请按 <code>N</code> 键打开终末地<strong class="text-primary">贵重品库</strong
+          请按 <v-hotkey keys="K" inline variant="flat" /> 键打开终末地<strong class="text-primary"
+            >贵重品库</strong
           >并切换到<strong class="text-primary">武器基质</strong>页面
         </li>
         <li>在运行过程中，请确保终末地窗口<strong class="text-primary">置于前台</strong></li>
@@ -50,13 +51,27 @@
 
       <h2>功能介绍</h2>
       <ul>
-        <li>按 <code>[</code> 键识别当前选中的基质是宝藏还是垃圾</li>
-        <li>按 <code>Alt+Delete</code> 退出程序</li>
+        <li>按 <v-hotkey keys="[" inline variant="flat" /> 键识别当前选中的基质是宝藏还是垃圾</li>
+        <li>
+          按
+          <v-hotkey keys="]" inline variant="flat" />
+          键扫描所有基质，并根据<router-link
+            to="/settings"
+            class="text-primary text-decoration-none"
+            ><strong>设置</strong></router-link
+          >，自动锁定或者解锁基质<br />
+          基质扫描过程中再次按 <v-hotkey keys="]" inline variant="flat" /> 键中断扫描
+        </li>
+
+        <li>按 <v-hotkey keys="Alt+DELETE" inline variant="flat" /> 退出程序</li>
       </ul>
 
       <p>
-        <strong class="text-primary">宝藏基质和垃圾基质：</strong
-        >如果这个基质和任何一把武器能对上<span class="text-secondary"
+        <strong class="text-primary">宝藏基质和垃圾基质：</strong>可以在<router-link
+          to="/settings"
+          class="text-primary text-decoration-none"
+          ><strong>设置</strong></router-link
+        >界面自定义。默认情况下，如果这个基质和任何一把武器能对上<span class="text-secondary"
           >（基质的所有属性与至少 1 件已实装武器的属性完全相同）</span
         >，则是宝藏，否则是垃圾。
       </p>

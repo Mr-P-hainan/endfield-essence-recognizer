@@ -12,6 +12,7 @@ import type { WikiEntryTable } from '@/types/endfielddata/TableCfg/WikiEntryTabl
 import type { WikiGroupTable } from '@/types/endfielddata/TableCfg/WikiGroupTable'
 import type { WorldEnergyPointGroupTable } from '@/types/endfielddata/TableCfg/WorldEnergyPointGroupTable'
 import type { WorldEnergyPointTable } from '@/types/endfielddata/TableCfg/WorldEnergyPointTable'
+import { useLanguage } from '@/composables/useLanguage'
 import { ref } from 'vue'
 
 /** 获取指定语言的国际化文本表路径 */
@@ -37,12 +38,13 @@ function parseJSONWithBigInt(text: string) {
 /**
  * 获取指定语言的文本内容
  * 如果找不到翻译或翻译为空，返回原始文本
+ * 如果不指定语言，使用当前选择的语言
  */
 export function getTranslation({ id, text }: TranslationKey, language?: string): string {
-  if (language === undefined) {
-    language = 'CN'
-  }
-  const translation = i18nTextTables.value.get(language)?.[String(id)]
+  const { currentLanguage } = useLanguage()
+  const lang = language ?? currentLanguage.value
+
+  const translation = i18nTextTables.value.get(lang)?.[String(id)]
   if (translation !== undefined) {
     return translation.trim()
   } else {

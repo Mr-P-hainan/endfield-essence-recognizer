@@ -14,10 +14,13 @@
 </template>
 
 <script lang="ts" setup>
+import { useLanguage } from '@/composables/useLanguage'
 import { updateText } from '@/utils/autoFontSizing'
 import { isLoaded } from '@/utils/gameData/gameData'
 import { getItemIconUrl, getItemName, getItemTierColor } from '@/utils/gameData/item'
-import { computed, nextTick, onMounted, useTemplateRef, watch } from 'vue'
+import { computed, useTemplateRef, watch } from 'vue'
+
+const { currentLanguage } = useLanguage()
 
 interface Props {
   itemId: string
@@ -40,7 +43,7 @@ const itemName = computed(() => {
   }
 })
 
-watch([props, itemNameRef, isLoaded], () => {
+watch([props, itemNameRef, isLoaded, currentLanguage], () => {
   if (itemNameRef.value) {
     updateText(itemNameRef.value, (itemNameContainerRef.value?.clientWidth || 96) * 0.95, 10, 16)
   }

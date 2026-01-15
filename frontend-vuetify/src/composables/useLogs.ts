@@ -19,9 +19,8 @@ let reconnectTimer: number | null = null
 const maxLogs = 1000
 
 function connectWebSocket() {
-  const apiBaseUrl = new URL(import.meta.env.VITE_API_BASE_URL)
-  const protocol = apiBaseUrl.protocol === 'https:' ? 'wss:' : 'ws:'
-  const wsUrl = `${protocol}//${apiBaseUrl.host}/ws/logs`
+  const url = import.meta.env.VITE_API_BASE_URL || window.location.origin
+  const wsUrl = `${url.replace(/^http/, 'ws')}/ws/logs`
 
   websocket = new WebSocket(wsUrl)
 
